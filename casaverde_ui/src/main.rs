@@ -1,29 +1,84 @@
 use crossterm::{
-    event::{self, Event, KeyCode, MouseButton, MouseEventKind},
+    event::{self, Event, KeyCode},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
 use ratatui::{
-    prelude::*,
-    widgets::{Block, Borders, Paragraph, Widget},
+    backend::CrosstermBackend,
+    layout::{Constraint, Direction, Layout},
+    style::{Color, Style},
+    text::Span,
+    widgets::{Block, Borders, List, ListItem, Paragraph},
+    Frame, Terminal,
 };
-use std::io::{self, Stdout};
+use std::{
+    io::{self, Stdout},
+    time::Duration,
+};
 
-struct GreenhouseApp {
-    button_pressed: bool,
+/// Your five sensors
+#[derive(Copy, Clone)]
+enum Sensor {
+    Solar,
+    Temperature,
+    Moisture,
+    Humidity,
+    Sunlight,
+}
+
+impl Sensor {
+    /// All sensors in display order
+    const ALL: [Sensor; 5] = [
+        Sensor::Solar,
+        Sensor::Temperature,
+        Sensor::Moisture,
+        Sensor::Humidity,
+        Sensor::Sunlight,
+    ];
+
+    /// Human‐readable name
+    fn name(self) -> &'static str {
+        match self {
+            Sensor::Solar => "Solar Sensor",
+            Sensor::Temperature => "Temperature Sensor",
+            Sensor::Moisture => "Moisture Sensor",
+            Sensor::Humidity => "Humidity Sensor",
+            Sensor::Sunlight => "Sunlight Sensor",
+        }
+    }
+}
+
+/// The application state
+struct CasaverdeApp {
+    sensor_states: [bool; Sensor::ALL.len()], // ON/OFF for each sensor
+    selected: usize,                          // which sensor is highlighted
     should_quit: bool,
 }
 
-impl GreenhouseApp {
+impl CasaverdeApp {
     fn new() -> Self {
         Self {
-            button_pressed: false,
+            sensor_states: [false; Sensor::ALL.len()],
+            selected: 0, // start on the first sensor
             should_quit: false,
         }
     }
 
     fn toggle_sensor(&mut self) {
-        self.button_pressed = !self.button_pressed;
+        // flip the bool at `selected`
+        self.sensor_states[self.selected] = !self.sensor_states[self.selected];
+    }
+
+    fn move_up(&mut self) {
+        if self.selected > 0 {
+            self.selected -= 1;
+        }
+    }
+
+    fn move_down(&mut self) {
+        if self.selected + 1 < self.sensor_states.len() {
+            self.selected += 1;
+        }
     }
 
     fn quit(&mut self) {
@@ -32,18 +87,18 @@ impl GreenhouseApp {
 }
 
 fn main() -> io::Result<()> {
-    // Initialize terminal
+    // Enter raw mode + alternate screen
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     stdout.execute(EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // Run app
-    let mut app = GreenhouseApp::new();
+    // Run the app
+    let mut app = CasaverdeApp::new();
     let res = run_app(&mut terminal, &mut app);
 
-    // Cleanup terminal
+    // Cleanup
     disable_raw_mode()?;
     terminal.backend_mut().execute(LeaveAlternateScreen)?;
     terminal.show_cursor()?;
@@ -53,77 +108,94 @@ fn main() -> io::Result<()> {
 
 fn run_app(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
-    app: &mut GreenhouseApp,
+    app: &mut CasaverdeApp,
 ) -> io::Result<()> {
-    while !app.should_quit {
+    // Initial draw
+    terminal.draw(|frame| ui(frame, app))?;
+
+    // Event loop
+    loop {
+        if app.should_quit {
+            break;
+        }
+
+        // Poll for up to 200ms
+        if event::poll(Duration::from_millis(200))? {
+            if let Event::Key(key) = event::read()? {
+                match key.code {
+                    KeyCode::Char('q') => app.quit(),
+                    KeyCode::Up => app.move_up(),
+                    KeyCode::Down => app.move_down(),
+                    KeyCode::Enter => app.toggle_sensor(),
+                    _ => {}
+                }
+            }
+        }
+
+        // Redraw
         terminal.draw(|frame| ui(frame, app))?;
-        handle_events(app)?;
     }
+
     Ok(())
 }
 
-fn ui(frame: &mut Frame, app: &GreenhouseApp) {
+fn ui(frame: &mut Frame, app: &CasaverdeApp) {
     let area = frame.area();
-    let layout = Layout::default()
+    let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // Title
-            Constraint::Length(5), // Button
-            Constraint::Length(3), // Status
-            Constraint::Min(0),    // Spacer
+            Constraint::Length(3),                              // Title box
+            Constraint::Length((Sensor::ALL.len() as u16) + 2), // Sensors box
+            Constraint::Length(3),                              // Status box
+            Constraint::Min(0),                                 // Spacer
         ])
         .split(area);
 
-    // Title
-    let title = Paragraph::new("Greenhouse Control")
+    // 1) Title, centered
+    let title = Paragraph::new("Casaverde")
+        .block(Block::new().borders(Borders::ALL))
         .style(Style::default().fg(Color::Green))
-        .block(Block::new().borders(Borders::ALL));
-    frame.render_widget(title, layout[0]);
+        .alignment(ratatui::layout::Alignment::Center);
+    frame.render_widget(title, chunks[0]);
 
-    // Toggle Sensor Button
-    let button_text = "[ Toggle Sensor ]";
-    let button = Paragraph::new(button_text)
-        .style(
-            Style::default()
-                .fg(Color::Yellow)
-                .bg(if app.button_pressed {
-                    Color::DarkGray
-                } else {
-                    Color::Reset
-                }),
+    // 2) Sensor list in a yellow box with centered header
+    let items: Vec<ListItem> = Sensor::ALL
+        .iter()
+        .enumerate()
+        .map(|(i, &sensor)| {
+            let flag = if app.sensor_states[i] {
+                "[ON]  "
+            } else {
+                "[OFF] "
+            };
+            ListItem::new(Span::raw(format!("{}{}", flag, sensor.name())))
+        })
+        .collect();
+
+    let mut list_state = ratatui::widgets::ListState::default();
+    list_state.select(Some(app.selected));
+
+    let sensors = List::new(items)
+        .block(
+            Block::new()
+                .borders(Borders::ALL)
+                .title("Sensors")
+                .title_alignment(ratatui::layout::Alignment::Center)
+                .style(Style::default().fg(Color::Yellow)),
         )
-        .block(Block::new().borders(Borders::ALL).title("Button"));
-    frame.render_widget(button, layout[1]);
+        .highlight_symbol(">> ")
+        .highlight_style(Style::default().bg(Color::DarkGray));
 
-    // Status
-    let status = Paragraph::new(if app.button_pressed {
-        "Sensor: ON"
-    } else {
-        "Sensor: OFF"
-    })
+    frame.render_stateful_widget(sensors, chunks[1], &mut list_state);
+
+    // 3) Status line, centered
+    let status = Paragraph::new(format!(
+        "Toggle with Enter  (selected: {})",
+        Sensor::ALL[app.selected].name()
+    ))
+    .block(Block::new().borders(Borders::ALL))
     .style(Style::default().fg(Color::Cyan))
-    .block(Block::new().borders(Borders::ALL));
-    frame.render_widget(status, layout[2]);
-}
+    .alignment(ratatui::layout::Alignment::Center);
 
-fn handle_events(app: &mut GreenhouseApp) -> io::Result<()> {
-    if event::poll(std::time::Duration::from_millis(100))? {
-        match event::read()? {
-            Event::Key(key) => {
-                if key.code == KeyCode::Char('q') {
-                    app.quit();
-                }
-            }
-            Event::Mouse(mouse) => {
-                if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
-                    // Check if click is within button area (approx. y=4-8 for button)
-                    if mouse.row >= 4 && mouse.row <= 8 {
-                        app.toggle_sensor();
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-    Ok(())
+    frame.render_widget(status, chunks[2]);
 }
