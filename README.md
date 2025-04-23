@@ -1,4 +1,4 @@
-[![Preview](https://github.com/cvusmo/casaverde/blob/dev/casaverde_ui/assets/casaverde_preview.png?raw=true)
+![Preview](https://github.com/cvusmo/casaverde/blob/dev/casaverde_ui/assets/casaverde_preview.png?raw=true)
 
 # casaverde
 CasaVerde is a terminal-based application for monitoring and controlling a greenhouse, built for Orange Pi single-board computers. It provides a simple interface for managing environmental sensors, designed for low-resource hardware. This will be developed into a touchscreen application.
