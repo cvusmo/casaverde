@@ -12,7 +12,7 @@ pub fn create_layout(area: Rect) -> Vec<Rect> {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3), // Title
-            Constraint::Length(7), // Sensors (5 sensors + borders)
+            Constraint::Min(7),    // Sensors or Monitoring (dynamic height)
             Constraint::Length(3), // Status
             Constraint::Min(0),    // Spacer
         ])

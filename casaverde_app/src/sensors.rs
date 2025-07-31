@@ -55,8 +55,10 @@ pub struct SensorData {
 
 impl SensorData {
     pub fn new() -> Self {
+        let mut states = [false; Sensor::ALL.len()];
+        states[Sensor::Temperature as usize] = true; // Enable Temperature by default
         Self {
-            states: [false; Sensor::ALL.len()],
+            states,
             temp_data: TempData { cpu: None, gpu: None },
             last_updated: Instant::now(),
             client: Client::builder().build().unwrap(),
@@ -65,7 +67,7 @@ impl SensorData {
 
     pub async fn update_temperatures(&mut self) {
         if self.states[Sensor::Temperature as usize] && self.last_updated.elapsed() >= Duration::from_secs(5) {
-            match self.client.get("http://10.0.0.6:3000/temps").send().await {
+            match self.client.get("http://10.0.0.50:3000/temps").send().await {
                 Ok(resp) => {
                     if let Ok(data) = resp.json::<TempData>().await {
                         self.temp_data = data;
@@ -77,7 +79,7 @@ impl SensorData {
         }
     }
 
-    pub fn toggle_sensor(& mut self, index: usize) {
+    pub fn toggle_sensor(&mut self, index: usize) {
         self.states[index] = !self.states[index];
     }
 }

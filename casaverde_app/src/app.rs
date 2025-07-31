@@ -9,10 +9,17 @@ use crate::sensors::SensorData;
 use ratatui::backend::CrosstermBackend;
 use std::io;
 
+#[derive(Clone, Copy, PartialEq)]
+pub enum Screen {
+    Sensors,    // Sensor selection screen
+    Monitoring, // New temperature monitoring screen
+}
+
 pub struct CasaverdeApp {
     pub sensor_data: SensorData,
     pub selected: usize,
     pub should_quit: bool,
+    pub screen: Screen, // Track current screen
 }
 
 impl CasaverdeApp {
@@ -21,23 +28,31 @@ impl CasaverdeApp {
             sensor_data: SensorData::new(),
             selected: 0,
             should_quit: false,
+            screen: Screen::Sensors, // Start on sensor screen
         }
     }
 
     pub fn move_up(&mut self) {
-        if self.selected > 0 {
+        if self.screen == Screen::Sensors && self.selected > 0 {
             self.selected -= 1;
         }
     }
 
     pub fn move_down(&mut self) {
-        if self.selected + 1 < self.sensor_data.states.len() {
+        if self.screen == Screen::Sensors && self.selected + 1 < self.sensor_data.states.len() {
             self.selected += 1;
         }
     }
 
     pub fn quit(&mut self) {
-        self.should_quit = true
+        self.should_quit = true;
+    }
+
+    pub fn switch_screen(&mut self) {
+        self.screen = match self.screen {
+            Screen::Sensors => Screen::Monitoring,
+            Screen::Monitoring => Screen::Sensors,
+        };
     }
 }
 
