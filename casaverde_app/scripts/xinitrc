@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Set Flatpak for env for Deskflow
+export XDG_DATA_DIRS=$XDG_DATA_DIRS:/var/lib/flatpak/exports/share:/home/casaverde/.local/share/flatpak/exports/share
+
+# Start Deskflow
+flatpak run org.deskflow.deskflow &
+DESKFLOW_PID=$!
+
+# Start WM
+openbox &
+
+# Start casaverde app in xterm
+xterm -fa "Monospace" -fs 18 -bg black -fg white -e "cargo run --release"
+
+# Clean up Deskflow on exit
+kill $DESKFLOW_PID
