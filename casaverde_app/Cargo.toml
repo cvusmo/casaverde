@@ -1,0 +1,8 @@
+[package]
+name = "casaverde_app"
+version = "0.1.1"
+edition = "2024"
+
+[dependencies]
+ratatui = "0.28.1"
+crossterm = "0.28.1"
