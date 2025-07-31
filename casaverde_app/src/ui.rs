@@ -11,10 +11,10 @@ pub fn create_layout(area: Rect) -> Vec<Rect> {
     Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // Title
-            Constraint::Min(7),    // Sensors or Monitoring (dynamic height)
-            Constraint::Length(3), // Status
-            Constraint::Min(0),    // Spacer
+            Constraint::Length(3),      // Title
+            Constraint::Percentage(80), // Sensors or Monitoring (dynamic height)
+            Constraint::Length(3),      // Status
+            Constraint::Min(0),         // Spacer
         ])
         .split(area)
         .to_vec()

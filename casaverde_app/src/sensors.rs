@@ -67,7 +67,8 @@ impl SensorData {
 
     pub async fn update_temperatures(&mut self) {
         if self.states[Sensor::Temperature as usize] && self.last_updated.elapsed() >= Duration::from_secs(5) {
-            match self.client.get("http://10.0.0.50:3000/temps").send().await {
+            // TODO: Change server to be dynamic 6 is blackbeard, 50 is blackbeard-s
+            match self.client.get("http://10.0.0.6:3000/temps").send().await {
                 Ok(resp) => {
                     if let Ok(data) = resp.json::<TempData>().await {
                         self.temp_data = data;
