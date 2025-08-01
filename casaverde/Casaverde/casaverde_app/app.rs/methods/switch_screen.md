@@ -1,0 +1,1 @@
+Toggles between [[Sensors]] and [[Monitoring]] screens

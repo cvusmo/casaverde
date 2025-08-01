@@ -2,9 +2,6 @@
 // github.com/cvusmo/casaverde/casaverde_app
 // src/ui.rs
 
-// Purpose:
-// Shared UI logic for TUI and touchscreen modes
-
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 pub fn create_layout(area: Rect) -> Vec<Rect> {
@@ -12,7 +9,7 @@ pub fn create_layout(area: Rect) -> Vec<Rect> {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),      // Title
-            Constraint::Percentage(80), // Sensors or Monitoring (dynamic height)
+            Constraint::Percentage(80), // Sensors
             Constraint::Length(3),      // Status
             Constraint::Min(0),         // Spacer
         ])

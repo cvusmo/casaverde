@@ -1,0 +1,1 @@
+Represents [[Sensors]] and [[Monitoring]] screens displayed on the TUI.

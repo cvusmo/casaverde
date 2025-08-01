@@ -2,9 +2,6 @@
 // github.com/cvusmo/casaverde/casaverde_app
 // src/app.rs
 
-// Purpose:
-// Defines the CasaverdeApp struct and methods for state management (navigation, quitting..)
-
 use crate::sensors::SensorData;
 use ratatui::backend::CrosstermBackend;
 use std::io;
@@ -19,7 +16,7 @@ pub struct CasaverdeApp {
     pub sensor_data: SensorData,
     pub selected: usize,
     pub should_quit: bool,
-    pub screen: Screen, // Track current screen
+    pub screen: Screen,
 }
 
 impl CasaverdeApp {
@@ -28,7 +25,7 @@ impl CasaverdeApp {
             sensor_data: SensorData::new(),
             selected: 0,
             should_quit: false,
-            screen: Screen::Sensors, // Start on sensor screen
+            screen: Screen::Sensors, 
         }
     }
 

@@ -1,0 +1,1 @@
+Initializes and runs the TUI interface

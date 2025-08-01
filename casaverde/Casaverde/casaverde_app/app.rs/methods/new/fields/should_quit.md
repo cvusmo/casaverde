@@ -1,0 +1,1 @@
+bool flag to indicate when to exit the application

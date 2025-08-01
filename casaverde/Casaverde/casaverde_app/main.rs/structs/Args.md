@@ -1,0 +1,1 @@
+Defines the CLI argument structure using clap::Parser

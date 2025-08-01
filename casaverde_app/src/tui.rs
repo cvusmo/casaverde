@@ -2,9 +2,6 @@
 // github.com/cvusmo/casaverde/casaverde_app
 // src/tui.rs
 
-// Purpose:
-// Handles TUI rendering and key event processing
-
 use crate::{
     app::{CasaverdeApp, Screen},
     sensors::Sensor,

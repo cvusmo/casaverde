@@ -2,10 +2,6 @@
 // github.com/cvusmo/casaverde/casaverde_app
 // src/sensors.rs
 
-// Purpose:
-// Defines the Sensor enum, manages sensor states, and fetches temperature data from
-// casaverde_server
-
 use reqwest::Client;
 use serde::Deserialize;
 use std::time::{Duration, Instant};

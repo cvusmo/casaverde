@@ -1,0 +1,1 @@
+usize index of the currently selected sensor in the [[Sensors]] screen.

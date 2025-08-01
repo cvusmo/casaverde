@@ -2,19 +2,10 @@
 // github.com/cvusmo/casaverde/casaverde_app
 // src/main.rs
 
-//  purpose:
-//  parses CLI arguments, initializes the app, and sets up the TUI or touchscreen mode
-
-mod app;
-mod sensors;
-mod touch;
-mod tui;
-mod ui;
-
 use app::{run_app, CasaverdeApp};
 use clap::Parser;
 use crossterm::{
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{disable_raw_mode, enable_raw_mode, LeaveAlternateScreen},
     ExecutableCommand,
 };
 use ratatui::backend::CrosstermBackend;

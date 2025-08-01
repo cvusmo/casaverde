@@ -1,0 +1,1 @@
+Displays a list of [[sensor_data]] for selection and toggling.

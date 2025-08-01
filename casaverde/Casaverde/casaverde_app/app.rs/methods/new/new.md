@@ -1,0 +1,1 @@
+Constructs a new [[CasaverdeApp]] instance with an initial state.
