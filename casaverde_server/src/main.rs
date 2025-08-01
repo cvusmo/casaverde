@@ -12,7 +12,7 @@ struct TempData {
 #[tokio::main]
 async fn main() {
     let app = Router::new().route("/temps", get(get_temperatures));
-    let listener = TcpListener::bind("10.0.0.6:3000").await.unwrap();
+    let listener = TcpListener::bind("10.0.0.12:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
 
