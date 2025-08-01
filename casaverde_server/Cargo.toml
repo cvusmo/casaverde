@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 axum = "0.8.4"
 axum-server = { version = "0.7.2", features = ["tls-rustls"] }
+dirs = "6.0.0"
 lazy_static = "1.5.0"
 tokio = { version = "1.47.0", features = ["full"] }
 serde = { version = "1.0.219", features = ["derive"] }
