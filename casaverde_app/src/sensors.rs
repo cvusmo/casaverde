@@ -2,6 +2,7 @@
 // github.com/cvusmo/casaverde/casaverde_app
 // src/sensors.rs
 
+use std::error::Error;
 use reqwest::{Client, Certificate};
 use serde::{Deserialize, Serialize};
 use std::{fs, time::{Duration, Instant}};
@@ -61,8 +62,7 @@ pub struct SensorData {
 
 impl SensorData {
     pub fn new(server: &str) -> Self {
-        // Load server certificate for pinning
-        let cert_path = "server.crt"; // Expected in casaverde_app directory
+        let cert_path = "server.crt";
         let cert = fs::read(cert_path)
             .map_err(|e| {
                 eprintln!("Failed to read server.crt: {e}. Place it in the project directory.");
@@ -79,7 +79,7 @@ impl SensorData {
             .expect("Failed to build reqwest client with certificate");
 
         let mut states = [false; Sensor::ALL.len()];
-        states[Sensor::Temperature as usize] = true; // Enable Temperature by default
+        states[Sensor::Temperature as usize] = true;
 
         Self {
             states,
@@ -96,48 +96,78 @@ impl SensorData {
             return;
         }
 
-        // Collect local temperatures
         self.temp_data = TempData {
             cpu: get_cpu_temp(),
             gpu: get_gpu_temp(),
         };
 
-        // Send data to server if updated recently
         if self.last_updated.elapsed() >= Duration::from_secs(5) {
             let reading = SensorReading {
                 client_id: self.client_id.clone(),
                 temp_data: self.temp_data.clone(),
             };
             let url = format!("{}/sensor_data", self.server);
+            eprintln!("Sending JSON: {:?}", serde_json::to_string(&reading).unwrap_or_default());
             match self.client.post(&url).json(&reading).send().await {
-                Ok(resp) if resp.status().is_success() => {
-                    println!("Successfully sent temperature data to server");
-                    self.last_updated = Instant::now();
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        println!("Successfully sent temperature data to server");
+                        self.last_updated = Instant::now();
+                    } else {
+                        eprintln!("Failed to send data to {}: status {}", url, resp.status());
+                        if let Ok(text) = resp.text().await {
+                            eprintln!("Server response: {}", text);
+                        }
+                    }
                 }
-                Ok(resp) => eprintln!("Failed to send data: {}", resp.status()),
-                Err(e) => eprintln!("Failed to send data to {}: {}", url, e),
+                Err(e) => {
+                    eprintln!("Failed to send data to {}: {}", url, e);
+                    if let Some(source) = e.source() {
+                        eprintln!("Error source: {}", source);
+                    }
+                    if e.is_connect() {
+                        eprintln!("Connection error: check server availability or network");
+                    }
+                    if e.is_timeout() {
+                        eprintln!("Request timed out");
+                    }
+                }
+            }
+        }
+    }
+
+    pub async fn get_all_temperatures(&self) -> Option<Vec<(String, TempData)>> {
+        let url = format!("{}/sensor_data", self.server);
+        match self.client.get(&url).send().await {
+            Ok(resp) => {
+                if resp.status().is_success() {
+                    match resp.json::<Vec<(String, TempData)>>().await {
+                        Ok(data) => Some(data),
+                        Err(e) => {
+                            eprintln!("Failed to parse JSON from {}: {}", url, e);
+                            None
+                        }
+                    }
+                } else {
+                    eprintln!("Failed to fetch data from {}: status {}", url, resp.status());
+                    if let Ok(text) = resp.text().await {
+                        eprintln!("Server response: {}", text);
+                    }
+                    None
+                }
+            }
+            Err(e) => {
+                eprintln!("Failed to fetch data from {}: {}", url, e);
+                if let Some(source) = e.source() {
+                    eprintln!("Error source: {}", source);
+                }
+                None
             }
         }
     }
 
     pub fn toggle_sensor(&mut self, index: usize) {
         self.states[index] = !self.states[index];
-    }
-
-    // Optional: Fetch all client data from server
-    pub async fn get_all_temperatures(&self) -> Option<Vec<(String, TempData)>> {
-        let url = format!("{}/sensor_data", self.server);
-        match self.client.get(&url).send().await {
-            Ok(resp) if resp.status().is_success() => resp.json().await.ok(),
-            Ok(resp) => {
-                eprintln!("Failed to fetch data: {}", resp.status());
-                None
-            }
-            Err(e) => {
-                eprintln!("Failed to fetch data from {}: {}", url, e);
-                None
-            }
-        }
     }
 }
 
