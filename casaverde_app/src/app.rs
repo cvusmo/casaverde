@@ -8,8 +8,8 @@ use std::io;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Screen {
-    Sensors,    // Sensor selection screen
-    Monitoring, // New temperature monitoring screen
+    Sensors,   
+    Monitoring, 
 }
 
 pub struct CasaverdeApp {
@@ -20,9 +20,9 @@ pub struct CasaverdeApp {
 }
 
 impl CasaverdeApp {
-    pub fn new() -> Self {
+    pub fn new(server: String) -> Self {
         Self {
-            sensor_data: SensorData::new(),
+            sensor_data: SensorData::new(&server),
             selected: 0,
             should_quit: false,
             screen: Screen::Sensors, 

@@ -2,9 +2,9 @@
 // github.com/cvusmo/casaverde/casaverde_app
 // src/sensors.rs
 
-use reqwest::Client;
+use reqwest::{Client, Certificate};
 use serde::Deserialize;
-use std::time::{Duration, Instant};
+use std::{fs, time::{Duration, Instant}};
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum Sensor {
@@ -47,32 +47,53 @@ pub struct SensorData {
     pub temp_data: TempData,
     last_updated: Instant,
     client: Client,
+    server: String,
 }
 
 impl SensorData {
-    pub fn new() -> Self {
+    pub fn new(server: &str) -> Self {
+        // Load server certificate for pinning
+        let cert_path = "server.crt"; // Expected in casaverde_app directory
+        let cert = fs::read(cert_path)
+            .map_err(|e| {
+                eprintln!("Failed t
+ o read server.crt: {e}. Place it in the
+ project directory.");                e
+            })
+            .ok()
+            .and_then(|cert_data| Certificate::from_pem(&cert_data).ok())
+            .expect("Failed to load or parse server.crt. Ensure it exists and is valid.");
+
+        let client = Client::builder()
+            .add_root_certificate(cert)
+            .use_rustls_tls()
+            .build()
+            .expect("Failed to build reqwest client with certificate");
+
         let mut states = [false; Sensor::ALL.len()];
         states[Sensor::Temperature as usize] = true; // Enable Temperature by default
         Self {
             states,
             temp_data: TempData { cpu: None, gpu: None },
             last_updated: Instant::now(),
-            client: Client::builder().build().unwrap(),
+            client,
+            server: server.to_string(),
         }
     }
 
     pub async fn update_temperatures(&mut self) {
         if self.states[Sensor::Temperature as usize] && self.last_updated.elapsed() >= Duration::from_secs(5) {
-            // TODO: Change server to be dynamic 6 is blackbeard, 12 is blackbeard-s
-            match self.client.get("http://10.0.0.12:3000/temps").send().await {
+            let url = format!("{}/temps", self.server);
+            match self.client.get(&url).send().await {
                 Ok(resp) => {
                     if let Ok(data) = resp.json::<TempData>().await {
                         self.temp_data = data;
                     }
                     self.last_updated = Instant::now();
                 }
-                Err(e) => eprintln!("Failed to fetch temperatures: {e}"),
-            }
+                Err(e) => eprintln!
+ ("Failed to fetch temperatures from {url
+ }: {e}"),            }
         }
     }
 

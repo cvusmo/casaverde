@@ -12,7 +12,6 @@ use ratatui::{
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
-    Frame,
 };
 use std::io;
 
@@ -41,9 +40,9 @@ pub fn render_tui(
                         let flag = if app.sensor_data.states[i] { "[ON]  " } else { "[OFF] " };
                         let value = if sensor == Sensor::Temperature && app.sensor_data.states[i] {
                             match (app.sensor_data.temp_data.cpu, app.sensor_data.temp_data.gpu) {
-                                (Some(cpu), Some(gpu)) => format!(" (CPU: {:.1}°C, GPU: {:.1}°C)", cpu, gpu),
-                                (Some(cpu), None) => format!(" (CPU: {:.1}°C, GPU: N/A)", cpu),
-                                (None, Some(gpu)) => format!(" (CPU: N/A, GPU: {:.1}°C)", gpu),
+                                (Some(cpu), Some(gpu)) => format!(" (CPU: {cpu:.1}°C, GPU: {gpu:.1}°C)"),
+                                (Some(cpu), None) => format!(" (CPU: {cpu:.1}°C, GPU: N/A)"),
+                                (None, Some(gpu)) => format!(" (CPU: N/A, GPU: {gpu:.1}°C)"),
                                 (None, None) => " (CPU: N/A, GPU: N/A)".to_string(),
                             }
                         } else {
@@ -73,16 +72,16 @@ pub fn render_tui(
                 // Monitoring screen: centered CPU/GPU temps
                 let temp_text = match (app.sensor_data.temp_data.cpu, app.sensor_data.temp_data.gpu) {
                     (Some(cpu), Some(gpu)) => vec![
-                        Line::from(format!("CPU: {:.1}°C", cpu)).centered(),
-                        Line::from(format!("GPU: {:.1}°C", gpu)).centered(),
+                        Line::from(format!("CPU: {cpu:.1}°C")).centered(),
+                        Line::from(format!("GPU: {gpu:.1}°C")).centered(),
                     ],
                     (Some(cpu), None) => vec![
-                        Line::from(format!("CPU: {:.1}°C", cpu)).centered(),
+                        Line::from(format!("CPU: {cpu:.1}°C")).centered(),
                         Line::from("GPU: N/A").centered(),
                     ],
                     (None, Some(gpu)) => vec![
                         Line::from("CPU: N/A").centered(),
-                        Line::from(format!("GPU: {:.1}°C", gpu)).centered(),
+                        Line::from(format!("GPU: {gpu:.1}°C")).centered(),
                     ],
                     (None, None) => vec![
                         Line::from("CPU: N/A").centered(),
@@ -110,9 +109,9 @@ pub fn render_tui(
                 if app.sensor_data.states[app.selected] {
                     match Sensor::ALL[app.selected] {
                         Sensor::Temperature => match (app.sensor_data.temp_data.cpu, app.sensor_data.temp_data.gpu) {
-                            (Some(cpu), Some(gpu)) => format!("Toggle with Enter, Switch to Monitor with m, Quit with q (CPU: {:.1}°C, GPU: {:.1}°C)", cpu, gpu),
-                            (Some(cpu), None) => format!("Toggle with Enter, Switch to Monitor with m, Quit with q (CPU: {:.1}°C, GPU: N/A)", cpu),
-                            (None, Some(gpu)) => format!("Toggle with Enter, Switch to Monitor with m, Quit with q (CPU: N/A, GPU: {:.1}°C)", gpu),
+                            (Some(cpu), Some(gpu)) => format!("Toggle with Enter, Switch to Monitor with m, Quit with q (CPU: {cpu:.1}°C, GPU: {gpu:.1}°C)"),
+                            (Some(cpu), None) => format!("Toggle with Enter, Switch to Monitor with m, Quit with q (CPU: {cpu:.1}°C, GPU: N/A)"),
+                            (None, Some(gpu)) => format!("Toggle with Enter, Switch to Monitor with m, Quit with q (CPU: N/A, GPU: {gpu:.1}°C)"),
                             (None, None) => "Toggle with Enter, Switch to Monitor with m, Quit with q (CPU: N/A, GPU: N/A)".to_string(),
                         },
                         _ => format!("Toggle with Enter, Switch to Monitor with m, Quit with q ({})", Sensor::ALL[app.selected].name()),
