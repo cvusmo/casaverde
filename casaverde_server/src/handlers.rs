@@ -22,6 +22,7 @@ pub async fn get_temperatures() -> Result<Json<Vec<(String, TempData)>>, (Status
 }
 
 pub async fn post_sensor_data(AxumJson(data): AxumJson<SensorReading>) {
+    eprintln!("Received POST data: client_id={}, temp_data={:?}", data.client_id, data.temp_data);
     insert_cache(data.client_id.clone(), (data.temp_data.clone(), std::time::Instant::now()));
 }
 

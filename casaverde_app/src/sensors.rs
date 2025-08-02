@@ -2,7 +2,6 @@
 // github.com/cvusmo/casaverde/casaverde_app
 // src/sensors.rs
 
-use std::error::Error;
 use reqwest::{Client, Certificate};
 use serde::{Deserialize, Serialize};
 use std::{fs, time::{Duration, Instant}};
@@ -75,6 +74,7 @@ impl SensorData {
         let client = Client::builder()
             .add_root_certificate(cert)
             .use_rustls_tls()
+            .danger_accept_invalid_certs(true) // Temporary bypass for debugging
             .build()
             .expect("Failed to build reqwest client with certificate");
 
