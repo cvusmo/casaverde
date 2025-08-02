@@ -2,6 +2,7 @@
 // github.com/cvusmo/casaverde/casaverde_app
 // src/sensors.rs
 
+use std::error::Error;
 use reqwest::{Client, Certificate};
 use serde::{Deserialize, Serialize};
 use std::{fs, time::{Duration, Instant}};
