@@ -4,7 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TempData {
     pub cpu: Option<f32>,
     pub gpu: Option<f32>,
