@@ -1,0 +1,1 @@
+Shows real-time monitoring data.

@@ -1,59 +1,57 @@
-use axum::{routing::get, Router, response::Json};
-use serde::Serialize;
-use std::process::Command;
-use tokio::net::TcpListener;
+// Copyright 2025 Nicholas Jordan. All Rights Reserved.
+// github.com/cvusmo/casaverde/casaverde_server
+// src/main.rs
 
-#[derive(Serialize)]
-struct TempData {
-    cpu: Option<f32>,
-    gpu: Option<f32>,
-}
+use axum::{routing::get, Router};
+use axum_server::tls_rustls::RustlsConfig;
+use std::{fs, io};
+use std::net::SocketAddr;
+use dirs::config_dir;
+use log::info;
+use env_logger;
+
+use casaverde_server::handlers;
 
 #[tokio::main]
-async fn main() {
-    let app = Router::new().route("/temps", get(get_temperatures));
-    let listener = TcpListener::bind("10.0.0.6:3000").await.unwrap();
-    axum::serve(listener, app).await.unwrap();
-}
+async fn main() -> io::Result<()> {
+    env_logger::init();
+    info!("Starting casaverde_server");
 
-async fn get_temperatures() -> Json<TempData> {
-    let sensors_output = Command::new("sensors")
-        .output()
-        .expect("Failed to run sensors");
-    let sensors_str = String::from_utf8_lossy(&sensors_output.stdout);
-    let cpu_temp = parse_cpu_temp(&sensors_str);
+    let addr = get_server_addr();
 
-    let nvidia_output = Command::new("nvidia-smi")
-        .arg("--query-gpu=temperature.gpu")
-        .arg("--format=csv,noheader")
-        .output()
-        .expect("Failed to run nvidia-smi");
-    let nvidia_str = String::from_utf8_lossy(&nvidia_output.stdout);
-    let gpu_temp = parse_gpu_temp(&nvidia_str);
+    let mut config_dir = config_dir().ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Config directory not found"))?;
+    config_dir.push("casaverde_server");
 
-    Json(TempData { cpu: cpu_temp, gpu: gpu_temp })
-}
+    fs::create_dir_all(&config_dir)?;
 
-fn parse_cpu_temp(output: &str) -> Option<f32> {
-    for line in output.lines() {
-        if line.contains("Package id 0") {
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            for part in parts {
-                if part.ends_with("°C") {
-                    if let Ok(temp) = part.trim_end_matches("°C").trim_start_matches('+').parse::<f32>() {
-                        return Some(temp);
-                    }
-                }
-            }
-        }
+    let mut cert_path = config_dir.clone();
+    cert_path.push("server.crt");
+    let mut key_path = config_dir.clone();
+    key_path.push("server.key");
+
+    if !cert_path.exists() || !key_path.exists() {
+        eprintln!("Error: Certificates not found in {}", config_dir.display());
+        eprintln!("Generate them by running './setup.sh' in the project directory");
+        return Err(io::Error::new(io::ErrorKind::NotFound, "Certificate or key file missing"));
     }
-    None
+
+    let config = RustlsConfig::from_pem_file(&cert_path, &key_path).await?;
+    info!("Server running on https://{addr}");
+
+    let app = Router::new()
+        .route("/temps", get(handlers::get_temperatures))
+        .route("/sensor_data", get(handlers::get_all_data).post(handlers::post_sensor_data));
+
+    axum_server::bind_rustls(addr, config)
+        .serve(app.into_make_service())
+        .await?;
+
+    Ok(())
 }
 
-fn parse_gpu_temp(output: &str) -> Option<f32> {
-    let temp_str = output.trim();
-    if temp_str.is_empty() {
-        return None;
-    }
-    temp_str.parse::<f32>().ok()
+fn get_server_addr() -> SocketAddr {
+    std::env::var("SERVER_IP")
+        .unwrap_or("10.0.0.12:3000".to_string())
+        .parse()
+        .expect("Invalid SERVER_IP format")
 }

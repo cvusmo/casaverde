@@ -1,0 +1,13 @@
+server = "https://10.0.0.12:3000"
+
+[[configs]]
+id = "sensor1"
+type = "temperature"
+endpoint = "https://10.0.0.12:3000/sensor_data"
+interval = 5
+
+[[configs]]
+id = "sensor2"
+type = "humidity"
+endpoint = "https://10.0.0.12:3000/sensor_data"
+interval = 10

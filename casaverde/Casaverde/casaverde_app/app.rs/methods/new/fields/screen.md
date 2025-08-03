@@ -1,0 +1,1 @@
+[[Casaverde/casaverde_app/app.rs/methods/new/fields/screen]] enum indicating the current view

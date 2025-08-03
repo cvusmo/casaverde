@@ -1,0 +1,1 @@
+Toggles the enabled/disabled state of a sensor at the specified index in the states array

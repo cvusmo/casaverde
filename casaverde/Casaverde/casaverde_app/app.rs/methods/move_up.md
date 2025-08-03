@@ -1,0 +1,1 @@
+moves the selection up on the [[Sensors]] screen

@@ -1,0 +1,1 @@
+A flag to enable TUI mode, defaulting to false when using the --tui argument
