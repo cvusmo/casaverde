@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 use reqwest::Client;
 use std::time::Duration;
-use log::{info, error};
+use log::info;
 use toml;
 
 #[derive(Debug, Deserialize)]

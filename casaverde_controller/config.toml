@@ -1,2 +1,2 @@
-server = "https://blackbeard-server:3000"
+server = "https://10.0.0.12:3000"
 controller_id = "blackbeard-pi"

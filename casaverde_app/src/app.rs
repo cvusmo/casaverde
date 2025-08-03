@@ -2,7 +2,7 @@
 // github.com/cvusmo/casaverde/casaverde_app
 // src/app.rs
 
-use crate::devices::DeviceData;
+use crate::devices::{DeviceData, Sensor};
 use ratatui::backend::CrosstermBackend;
 use std::io;
 
@@ -15,7 +15,7 @@ pub enum Screen {
 pub struct CasaverdeApp {
     pub sensor_data: DeviceData,
     pub selected: usize,
-    pub should_quit: bool,
+    pub quit: bool,
     pub screen: Screen,
 }
 
@@ -24,7 +24,7 @@ impl CasaverdeApp {
         Self {
             sensor_data: DeviceData::new("config.toml"),
             selected: 0,
-            should_quit: false,
+            quit: false,
             screen: Screen::Devices,
         }
     }
@@ -42,7 +42,7 @@ impl CasaverdeApp {
     }
 
     pub fn quit(&mut self) {
-        self.should_quit = true;
+        self.quit = true;
     }
 
     pub fn switch_screen(&mut self) {
@@ -50,6 +50,10 @@ impl CasaverdeApp {
             Screen::Devices => Screen::Monitoring,
             Screen::Monitoring => Screen::Devices,
         };
+    }
+
+    pub fn toggle_selected_sensor(&mut self) {
+        self.sensor_data.toggle_sensor(Sensor::Temperature);
     }
 }
 
@@ -59,7 +63,7 @@ pub async fn run_app(
 ) -> io::Result<()> {
     use crate::tui::{handle_tui_events, render_tui};
     loop {
-        if app.should_quit {
+        if app.quit {
             break;
         }
         app.sensor_data.update_devices().await;

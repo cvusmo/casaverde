@@ -4,6 +4,7 @@
 
 use crate::{
     app::{CasaverdeApp, Screen},
+    devices::Sensor,
     ui::create_layout,
 };
 use crossterm::event::{self, Event, KeyCode};
@@ -34,14 +35,20 @@ pub fn render_tui(
                 for i in 0..app.sensor_data.active_count {
                     let id = app.sensor_data.config.configs[i]
                         .id
-                        .trim_matches(char::from(0)); // Direct String access
+                        .trim_matches(char::from(0));
                     let value = app.sensor_data.device_values[i];
-                    let flag = if value.is_some() { "[ON]  " } else { "[OFF] " };
-                    let value_str = value.map_or("N/A".to_string(), |v| format!("{v:.1}"));
+
+                    let flag = if app.sensor_data.states[Sensor::Temperature as usize] {
+                        "[ON]  "
+                    } else {
+                        "[OFF] "
+                    };
+
+                    let value_str = value.map_or("N/A".to_string(), |v| format!("{v:.1}°C"));
                     items.push(ListItem::new(Span::raw(format!(
-                        "{} {}: {}",
-                        flag, id, value_str
+                        "{flag} {id}: {value_str}"
                     ))));
+                    info!("Rendering device {i}: id={id}, value={value:?}");
                 }
 
                 let mut list_state = ListState::default();
@@ -72,11 +79,13 @@ pub fn render_tui(
                         Line::from(format!(
                             "{}: {}",
                             id,
-                            value.map_or("N/A".to_string(), |v| format!("{v:.1}"))
+                            value.map_or("N/A".to_string(), |v| format!("{v:.1}°C"))
                         ))
                         .centered(),
                     );
+                    info!("Monitoring device {i}: id={id}, value={value:?}");
                 }
+
                 if temp_text.is_empty() {
                     temp_text.push(Line::from("No devices configured").centered());
                 }
@@ -126,6 +135,10 @@ pub fn handle_tui_events(app: &mut CasaverdeApp) -> io::Result<()> {
                 KeyCode::Char('s') if app.screen == Screen::Monitoring => {
                     app.switch_screen();
                     info!("Switched to Devices screen");
+                }
+                KeyCode::Char('t') if app.screen == Screen::Devices => {
+                    app.toggle_selected_sensor();
+                    info!("Toggled selected sensor");
                 }
                 _ => {}
             }
