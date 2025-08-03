@@ -5,13 +5,13 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct TempData {
-    pub cpu: Option<f32>,
-    pub gpu: Option<f32>,
+pub struct DeviceReading {
+    pub id: String,
+    pub value: Option<f32>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SensorReading {
     pub client_id: String,
-    pub temp_data: TempData,
+    pub devices: Vec<DeviceReading>,
 }

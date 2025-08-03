@@ -2,41 +2,41 @@
 // github.com/cvusmo/casaverde/casaverde_app
 // src/app.rs
 
-use crate::sensors::SensorData;
+use crate::devices::DeviceData;
 use ratatui::backend::CrosstermBackend;
 use std::io;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Screen {
-    Sensors,   
+    Devices,   
     Monitoring, 
 }
 
 pub struct CasaverdeApp {
-    pub sensor_data: SensorData,
+    pub sensor_data: DeviceData,
     pub selected: usize,
     pub should_quit: bool,
     pub screen: Screen,
 }
 
 impl CasaverdeApp {
-    pub fn new(server: String) -> Self {
+    pub fn new() -> Self {
         Self {
-            sensor_data: SensorData::new(&server),
+            sensor_data: DeviceData::new("config.toml"),
             selected: 0,
             should_quit: false,
-            screen: Screen::Sensors, 
+            screen: Screen::Devices,
         }
     }
 
     pub fn move_up(&mut self) {
-        if self.screen == Screen::Sensors && self.selected > 0 {
+        if self.screen == Screen::Devices && self.selected > 0 {
             self.selected -= 1;
         }
     }
 
     pub fn move_down(&mut self) {
-        if self.screen == Screen::Sensors && self.selected + 1 < self.sensor_data.states.len() {
+        if self.screen == Screen::Devices && self.selected + 1 < self.sensor_data.active_count {
             self.selected += 1;
         }
     }
@@ -47,8 +47,8 @@ impl CasaverdeApp {
 
     pub fn switch_screen(&mut self) {
         self.screen = match self.screen {
-            Screen::Sensors => Screen::Monitoring,
-            Screen::Monitoring => Screen::Sensors,
+            Screen::Devices => Screen::Monitoring,
+            Screen::Monitoring => Screen::Devices,
         };
     }
 }
@@ -62,7 +62,7 @@ pub async fn run_app(
         if app.should_quit {
             break;
         }
-        app.sensor_data.update_temperatures().await;
+        app.sensor_data.update_devices().await;
         render_tui(terminal, &app)?;
         handle_tui_events(&mut app)?;
     }

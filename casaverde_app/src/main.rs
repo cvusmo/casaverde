@@ -9,6 +9,8 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, LeaveAlternateScreen},
     ExecutableCommand,
 };
+use env_logger;
+use log::info;
 use ratatui::backend::CrosstermBackend;
 use std::io;
 
@@ -21,6 +23,9 @@ struct Args {
 }
 
 fn main() -> io::Result<()> {
+    env_logger::init();
+    info!("Starting Casaverde application");
+
     let args = Args::parse();
     let server = std::env::var("SERVER_IP")
         .map(|ip| format!("https://{ip}:3000"))
@@ -38,10 +43,11 @@ fn run_tui(server: &str) -> io::Result<()> {
     stdout.execute(LeaveAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = ratatui::Terminal::new(backend)?;
-    let app = CasaverdeApp::new(server.to_string());
+    let app = CasaverdeApp::new();
     let res = tokio::runtime::Runtime::new()?.block_on(run_app(&mut terminal, app));
     disable_raw_mode()?;
     terminal.backend_mut().execute(LeaveAlternateScreen)?;
     terminal.show_cursor()?;
+    info!("TUI session ended");
     res
 }

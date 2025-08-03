@@ -3,7 +3,7 @@
 // src/lib.rs
 
 pub mod app;
-pub mod sensors;
+pub mod devices;
 pub mod touch;
 pub mod tui;
 pub mod ui;

@@ -4,10 +4,10 @@
 
 use crate::{
     app::{CasaverdeApp, Screen},
-    sensors::Sensor,
     ui::create_layout,
 };
 use crossterm::event::{self, Event, KeyCode};
+use log::info;
 use ratatui::{
     style::{Color, Style},
     text::{Line, Span},
@@ -22,105 +22,83 @@ pub fn render_tui(
     terminal.draw(|frame| {
         let chunks = create_layout(frame.area());
 
-        // Title
         let title = Paragraph::new("Casaverde")
             .block(Block::new().borders(Borders::ALL))
             .style(Style::default().fg(Color::Green))
             .alignment(ratatui::layout::Alignment::Center);
         frame.render_widget(title, chunks[0]);
 
-        // Main content based on screen
         match app.screen {
-            Screen::Sensors => {
-                // Sensor list
-                let items: Vec<ListItem> = Sensor::ALL
-                    .iter()
-                    .enumerate()
-                    .map(|(i, &sensor)| {
-                        let flag = if app.sensor_data.states[i] { "[ON]  " } else { "[OFF] " };
-                        let value = if sensor == Sensor::Temperature && app.sensor_data.states[i] {
-                            match (app.sensor_data.temp_data.cpu, app.sensor_data.temp_data.gpu) {
-                                (Some(cpu), Some(gpu)) => format!(" (CPU: {cpu:.1}°C, GPU: {gpu:.1}°C)"),
-                                (Some(cpu), None) => format!(" (CPU: {cpu:.1}°C, GPU: N/A)"),
-                                (None, Some(gpu)) => format!(" (CPU: N/A, GPU: {gpu:.1}°C)"),
-                                (None, None) => " (CPU: N/A, GPU: N/A)".to_string(),
-                            }
-                        } else {
-                            String::new()
-                        };
-                        ListItem::new(Span::raw(format!("{}{}{}", flag, sensor.name(), value)))
-                    })
-                    .collect();
+            Screen::Devices => {
+                let mut items = Vec::with_capacity(app.sensor_data.active_count);
+                for i in 0..app.sensor_data.active_count {
+                    let id = app.sensor_data.config.configs[i]
+                        .id
+                        .trim_matches(char::from(0)); // Direct String access
+                    let value = app.sensor_data.device_values[i];
+                    let flag = if value.is_some() { "[ON]  " } else { "[OFF] " };
+                    let value_str = value.map_or("N/A".to_string(), |v| format!("{v:.1}"));
+                    items.push(ListItem::new(Span::raw(format!(
+                        "{} {}: {}",
+                        flag, id, value_str
+                    ))));
+                }
 
                 let mut list_state = ListState::default();
-                list_state.select(Some(app.selected));
+                list_state.select(Some(app.selected.min(items.len().saturating_sub(1))));
 
-                let sensors = List::new(items)
+                let devices = List::new(items.clone())
                     .block(
                         Block::new()
                             .borders(Borders::ALL)
-                            .title("Sensors")
+                            .title("Devices")
                             .title_alignment(ratatui::layout::Alignment::Center)
                             .style(Style::default().fg(Color::Yellow)),
                     )
                     .highlight_symbol(">> ")
                     .highlight_style(Style::default().bg(Color::DarkGray));
 
-                frame.render_stateful_widget(sensors, chunks[1], &mut list_state);
+                frame.render_stateful_widget(devices, chunks[1], &mut list_state);
+                info!("Rendered Devices screen with {} items", items.len());
             }
             Screen::Monitoring => {
-                // Monitoring screen: centered CPU/GPU temps
-                let temp_text = match (app.sensor_data.temp_data.cpu, app.sensor_data.temp_data.gpu) {
-                    (Some(cpu), Some(gpu)) => vec![
-                        Line::from(format!("CPU: {cpu:.1}°C")).centered(),
-                        Line::from(format!("GPU: {gpu:.1}°C")).centered(),
-                    ],
-                    (Some(cpu), None) => vec![
-                        Line::from(format!("CPU: {cpu:.1}°C")).centered(),
-                        Line::from("GPU: N/A").centered(),
-                    ],
-                    (None, Some(gpu)) => vec![
-                        Line::from("CPU: N/A").centered(),
-                        Line::from(format!("GPU: {gpu:.1}°C")).centered(),
-                    ],
-                    (None, None) => vec![
-                        Line::from("CPU: N/A").centered(),
-                        Line::from("GPU: N/A").centered(),
-                    ],
-                };
+                let mut temp_text = Vec::with_capacity(app.sensor_data.active_count);
+                for i in 0..app.sensor_data.active_count {
+                    let id = app.sensor_data.config.configs[i]
+                        .id
+                        .trim_matches(char::from(0));
+                    let value = app.sensor_data.device_values[i];
+                    temp_text.push(
+                        Line::from(format!(
+                            "{}: {}",
+                            id,
+                            value.map_or("N/A".to_string(), |v| format!("{v:.1}"))
+                        ))
+                        .centered(),
+                    );
+                }
+                if temp_text.is_empty() {
+                    temp_text.push(Line::from("No devices configured").centered());
+                }
 
-                let monitor = Paragraph::new(temp_text)
+                let monitor = Paragraph::new(temp_text.clone())
                     .block(
                         Block::new()
                             .borders(Borders::ALL)
-                            .title("Temperature Monitor")
+                            .title("Monitoring")
                             .title_alignment(ratatui::layout::Alignment::Center)
                             .style(Style::default().fg(Color::Yellow)),
                     )
                     .alignment(ratatui::layout::Alignment::Center);
 
                 frame.render_widget(monitor, chunks[1]);
+                info!("Rendered Monitoring screen with {} items", temp_text.len());
             }
         }
 
-        // Status
         let status_text = match app.screen {
-            Screen::Sensors => {
-                if app.sensor_data.states[app.selected] {
-                    match Sensor::ALL[app.selected] {
-                        Sensor::Temperature => match (app.sensor_data.temp_data.cpu, app.sensor_data.temp_data.gpu) {
-                            (Some(cpu), Some(gpu)) => format!("Toggle with Enter, Switch to Monitor with m, Quit with q (CPU: {cpu:.1}°C, GPU: {gpu:.1}°C)"),
-                            (Some(cpu), None) => format!("Toggle with Enter, Switch to Monitor with m, Quit with q (CPU: {cpu:.1}°C, GPU: N/A)"),
-                            (None, Some(gpu)) => format!("Toggle with Enter, Switch to Monitor with m, Quit with q (CPU: N/A, GPU: {gpu:.1}°C)"),
-                            (None, None) => "Toggle with Enter, Switch to Monitor with m, Quit with q (CPU: N/A, GPU: N/A)".to_string(),
-                        },
-                        _ => format!("Toggle with Enter, Switch to Monitor with m, Quit with q ({})", Sensor::ALL[app.selected].name()),
-                    }
-                } else {
-                    format!("Toggle with Enter, Switch to Monitor with m, Quit with q ({})", Sensor::ALL[app.selected].name())
-                }
-            }
-            Screen::Monitoring => "Switch to Sensors with s, Quit with q".to_string(),
+            Screen::Devices => "Navigate with Up/Down, Switch to Monitor with m, Quit with q",
+            Screen::Monitoring => "Switch to Devices with s, Quit with q",
         };
         let status = Paragraph::new(status_text)
             .block(Block::new().borders(Borders::ALL))
@@ -135,14 +113,20 @@ pub fn handle_tui_events(app: &mut CasaverdeApp) -> io::Result<()> {
     if event::poll(std::time::Duration::from_millis(200))? {
         if let Event::Key(key) = event::read()? {
             match key.code {
-                KeyCode::Char('q') => app.quit(),
-                KeyCode::Up if app.screen == Screen::Sensors => app.move_up(),
-                KeyCode::Down if app.screen == Screen::Sensors => app.move_down(),
-                KeyCode::Enter if app.screen == Screen::Sensors => {
-                    app.sensor_data.toggle_sensor(app.selected)
+                KeyCode::Char('q') => {
+                    app.quit();
+                    info!("Quit command received");
                 }
-                KeyCode::Char('m') => app.switch_screen(), // Switch to Monitoring
-                KeyCode::Char('s') if app.screen == Screen::Monitoring => app.switch_screen(), // Switch to Sensors
+                KeyCode::Up if app.screen == Screen::Devices => app.move_up(),
+                KeyCode::Down if app.screen == Screen::Devices => app.move_down(),
+                KeyCode::Char('m') => {
+                    app.switch_screen();
+                    info!("Switched to Monitoring screen");
+                }
+                KeyCode::Char('s') if app.screen == Screen::Monitoring => {
+                    app.switch_screen();
+                    info!("Switched to Devices screen");
+                }
                 _ => {}
             }
         }
