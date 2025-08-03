@@ -1,0 +1,2 @@
+server = "https://blackbeard-server:3000"
+controller_id = "blackbeard-pi"

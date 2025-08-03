@@ -84,8 +84,8 @@
 			"type":"text",
 			"text":"## ISSUE:\n1. casaverde_app:\n\t- Does every device run it's own casaverde_app?\n\t- How are device ID's (UUID's) organized, and cached to keep data paths flowing properly?\n\t- How is data secured (encryption, decryption)?\n\t- No data to be transmitted via Bluetooth or WiFi.\n\t- No data to be exposed to any external network\n\t- How does TLS 1.3 integrate into this?\n\t- If there's one casaverde_app, then what is the primary client that communicates to the server?\n\t- How do control units integrate in this ecosystem?\n\t- What methods of testing do I have available that is cheap and affordable to reproduce and test?\n2. Update and FIX current documentation to reflect the current dev build.\n\t- Also decide on versioning and build (0.1.1.1000-p)?",
 			"styleAttributes":{},
-			"x":-2420,
-			"y":-460,
+			"x":-3880,
+			"y":-490,
 			"width":980,
 			"height":1640
 		}

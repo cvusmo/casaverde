@@ -1,0 +1,1 @@
+Handles GET requests to the endpoint, retrieving a list of client IDs and their associated device readings from the cache.

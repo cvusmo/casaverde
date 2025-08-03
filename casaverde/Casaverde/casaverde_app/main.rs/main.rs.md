@@ -1,11 +1,12 @@
 # Purpose:
+- Acts as the main executable entry point for [[casaverde_app]], handling initialization, 
 
 ## Contents:
 ### Structs:
-- [[Args]]:
-	- Defines the command-line argument structure using clap::Parser
+- [[Args]]
 	- Fields:
-		- [[tui]]
+		- [[tui]]: bool
+		- [[server]]: string
 ### Methods:
-- [[main]]
+- [[Casaverde/casaverde_app/main.rs/methods/main]]
 - [[run_tui]]

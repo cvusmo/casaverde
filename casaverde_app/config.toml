@@ -1,13 +1,13 @@
-server = "https://10.0.0.12:3000"
+server = "https://blackbeard-server:3000"
 
 [[configs]]
-id = "sensor1"
+id = "blackbeard-cpu"
 type = "temperature"
-endpoint = "https://10.0.0.12:3000/sensor_data"
+endpoint = "https://blackbeard-server:3000/sensor_data"
 interval = 5
 
 [[configs]]
-id = "sensor2"
+id = "blackbeard-gpu"
 type = "humidity"
-endpoint = "https://10.0.0.12:3000/sensor_data"
+endpoint = "https://blackbeard-server:3000/sensor_data"
 interval = 10

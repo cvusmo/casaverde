@@ -1,0 +1,1 @@
+Initializes a new [[DeviceData]] instance by reading and parsing a configuration file at [[config_path]], sets up a secure HTTP client, and preparing the [[device_values]] vector.

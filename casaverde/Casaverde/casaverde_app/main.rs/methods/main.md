@@ -1,1 +1,1 @@
-Serves as the application entry point
+Serves as the application entry point. Responsible for initializing logging, parsing CLI arguments, determining the server URL, and launching the appropriate mode (TUI/touchscreen)

@@ -1,0 +1,1 @@
+Creates the TUI ui layout with method [create_layout]]
