@@ -19,8 +19,19 @@ pub struct DeviceConfig {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DeviceConfigRoot {
     pub server: String,
-    pub device_count: usize,
     pub configs: Vec<DeviceConfig>,
+}
+
+#[derive(Serialize)]
+struct SensorReading {
+    client_id: String,
+    devices: Vec<DeviceReading>,
+}
+
+#[derive(Serialize)]
+struct DeviceReading {
+    id: String,
+    value: Option<f32>,
 }
 
 #[derive(Clone)]
@@ -49,8 +60,8 @@ impl DeviceData {
             }
         };
 
-        config.device_count = config.configs.len().min(16);
-        config.configs.truncate(config.device_count);
+        let device_count = config.configs.len().min(16);
+        config.configs.truncate(device_count);
 
         let cert = match fs::read("server.crt") {
             Ok(cert_data) => match Certificate::from_pem(&cert_data) {
@@ -73,23 +84,44 @@ impl DeviceData {
             .build()
             .expect("Failed to build secure client");
 
-        let device_values = vec![None; config.device_count];
-        info!("DeviceData initialized with {} devices", config.device_count);
+        let mut device_values = vec![None; device_count];
+        info!("DeviceData initialized with {} devices", device_count);
         Self {
             device_values,
             last_updated: Instant::now(),
             client,
-            config: config.clone(),
-            active_count: config.device_count,
+            config,
+            active_count: device_count,
         }
     }
 
     pub async fn update_devices(&mut self) {
-        for i in 0..self.config.device_count {
+        let client_id = "casaverde_app".to_string(); // Hardcoded for now
+        let readings = self.device_values
+            .iter()
+            .enumerate()
+            .filter_map(|(i, value)| {
+                self.config.configs.get(i).map(|config| DeviceReading {
+                    id: config.id.clone(),
+                    value: *value,
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let reading = SensorReading {
+            client_id: client_id.clone(),
+            devices: readings,
+        };
+
+        for i in 0..self.config.configs.len() {
             let interval = Duration::from_secs(self.config.configs[i].interval as u64);
             if self.last_updated.elapsed() >= interval {
                 let url = &self.config.configs[i].endpoint;
-                match self.client.get(url).send().await {
+                match self.client.post(url)
+                    .json(&reading)
+                    .send()
+                    .await
+                {
                     Ok(resp) if resp.status().is_success() => {
                         if let Ok(value) = resp.json::<f32>().await {
                             self.device_values[i] = Some(value);
@@ -97,7 +129,7 @@ impl DeviceData {
                         }
                     }
                     Ok(resp) => warn!("Non-success status from {}: {}", url, resp.status()),
-                    Err(e) => error!("Failed to fetch from {}: {}", url, e),
+                    Err(e) => error!("Failed to post to {}: {}", url, e),
                 }
             }
         }
