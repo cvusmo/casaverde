@@ -3,9 +3,10 @@
 // src/main.rs
 
 use serde::{Deserialize, Serialize};
-use reqwest::Client;
+use reqwest::{Client, Certificate};
 use std::time::Duration;
-use log::info;
+use std::fs;
+use log::{error, info};
 use toml;
 
 #[derive(Debug, Deserialize)]
@@ -33,7 +34,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let config_str = std::fs::read_to_string("config.toml")?;
     let config: Config = toml::from_str(&config_str)?;
-    let client = Client::new();
+
+    let cert = match fs::read("server.crt") {
+        Ok(cert_data) => match Certificate::from_pem(&cert_data) {
+            Ok(c) => {
+                info!("Certificate loaded successfully");
+                c
+            }
+            Err(e) => {
+                error!("Invalid certificate: {e}");
+                panic!("Certificate validation failed");
+            }
+        },
+        Err(e) => {
+            error!("Failed to read server.crt: {e}");
+            panic!("Certificate read failed");
+        }
+    };
+
+    let client = Client::builder()
+        .add_root_certificate(cert)
+        .use_rustls_tls()
+        .min_tls_version(reqwest::tls::Version::TLS_1_3)
+        .danger_accept_invalid_certs(true) // TEMPORARY BYPASS
+        .build()
+        .expect("Failed to build secure client");
 
     loop {
         let resp = client.get(format!("{}/temps", config.server))
