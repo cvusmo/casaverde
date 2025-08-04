@@ -1,0 +1,1 @@
+Sends a command to the serial port, formatting it as a string and writing it to the micro controller, returning with error handling for write operations.

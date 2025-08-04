@@ -1,4 +1,4 @@
-The root configuration structure loaded from [[config.toml]], containing the server URL and a list of device configurations.
+The root configuration structure loaded from [[Casaverde/casaverde_app/config.toml]], containing the server URL and a list of device configurations.
 
 - Fields
 	- server: String - the base URL of the [[casaverde_server]]

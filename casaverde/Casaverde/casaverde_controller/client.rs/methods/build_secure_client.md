@@ -1,0 +1,1 @@
+Builds a secure reqwest::Client with TLS 1.3 and a certificate from server.crt for communication with [[casaverde_server]]

@@ -3,8 +3,8 @@
 		{"id":"8f2159686d098b90","type":"file","file":"Casaverde/casaverde_server/casaverde_server.md","x":-840,"y":-320,"width":510,"height":80},
 		{"id":"fbe0de5e542a8c1b","type":"text","text":"# DATA FLOW","x":-1312,"y":-460,"width":1457,"height":80},
 		{"id":"21c0d9b857830094","type":"file","file":"Casaverde/casaverde_app/casaverde_app.md","x":-1239,"y":-20,"width":435,"height":80},
-		{"id":"3ef9a6f2d5a69736","type":"file","file":"Casaverde/device a.md","x":-1320,"y":120,"width":260,"height":80},
-		{"id":"bbbafb23a1dad050","type":"file","file":"Casaverde/device b.md","x":-1010,"y":120,"width":270,"height":80},
+		{"id":"3ef9a6f2d5a69736","type":"file","file":"Casaverde Design Concepts/device a.md","x":-1320,"y":120,"width":260,"height":80},
+		{"id":"bbbafb23a1dad050","type":"file","file":"Casaverde Design Concepts/device b.md","x":-1010,"y":120,"width":270,"height":80},
 		{"id":"d427f075d35a25f8","type":"text","text":"# casaverde_controller","x":-425,"y":-20,"width":570,"height":80},
 		{"id":"4b13fa010349c2ee","type":"text","text":"## data ","x":-1272,"y":250,"width":165,"height":80},
 		{"id":"b012f1e7bc963538","type":"text","text":"## data ","x":-954,"y":250,"width":159,"height":80},
@@ -88,7 +88,8 @@
 			"y":-490,
 			"width":980,
 			"height":1640
-		}
+		},
+		{"id":"040a6e77a664b5c9","type":"file","file":"assets/pictures/75HC595-pinout.png","x":-1312,"y":1480,"width":1534,"height":880}
 	],
 	"edges":[
 		{"id":"f4cf6de66ccf54b9","fromNode":"4b13fa010349c2ee","fromSide":"top","toNode":"3ef9a6f2d5a69736","toSide":"bottom"},

@@ -11,14 +11,17 @@
             "id": "9b5ae3b2a58ec8c4",
             "type": "leaf",
             "state": {
-              "type": "markdown",
+              "type": "canvas",
               "state": {
-                "file": "Casaverde/casaverde_server/models.rs/structs/SensorReading.md",
-                "mode": "source",
-                "source": false
+                "file": "Casaverde Design Concepts/casaverde design map.canvas",
+                "viewState": {
+                  "x": -564.8260957655299,
+                  "y": 1070.9538693223292,
+                  "zoom": -0.8000000000000002
+                }
               },
-              "icon": "lucide-file",
-              "title": "SensorReading"
+              "icon": "lucide-layout-dashboard",
+              "title": "casaverde design map"
             }
           },
           {
@@ -38,8 +41,7 @@
               "title": "casaverde design map"
             }
           }
-        ],
-        "currentTab": 1
+        ]
       }
     ],
     "direction": "vertical"
@@ -187,45 +189,47 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "aec0ffcb4c9f8b68",
+  "active": "9b5ae3b2a58ec8c4",
   "lastOpenFiles": [
-    "Casaverde/casaverde_server/models.rs/structs/SensorReading.md",
-    "Casaverde/casaverde_server/models.rs/structs/DeviceReading.md",
-    "Casaverde/casaverde_server/models.rs/models.rs.md",
-    "Casaverde/casaverde_server/devices.rs/structs/SensorReading.md",
-    "Casaverde/casaverde_server/devices.rs/structs",
-    "Casaverde/casaverde_server/devices.rs",
-    "Casaverde/casaverde_app/devices.rs/structs/DeviceReading.md",
-    "Casaverde/casaverde_server/models.rs/structs",
-    "Casaverde/casaverde_server/handlers.rs/handlers.rs.md",
-    "Casaverde/casaverde_server/handlers.rs/methods/get_all_data.md",
-    "Casaverde/casaverde_server/handlers.rs/methods/post_sensor_data.md",
-    "Casaverde/casaverde_server/handlers.rs/methods/get_temperature.md",
-    "Casaverde/casaverde_app/tui.rs/methods/handle_tui_events.md",
-    "Casaverde/casaverde_app/tui.rs/methods",
-    "Casaverde/casaverde_server/handlers.rs/methods",
-    "Casaverde/casaverde_server/cache.rs/cache.rs.md",
-    "Casaverde/casaverde_server/cache.rs/methods/insert_cache.md",
-    "Casaverde/casaverde_server/cache.rs/methods/get_cache.md",
-    "Casaverde/casaverde_server/cache.rs/methods",
-    "Casaverde/casaverde_server/main.rs/main.rs.md",
-    "Casaverde/casaverde_server/main.rs/methods/get_server_addr.md",
-    "Casaverde/casaverde_server/main.rs/methods/main.md",
-    "Casaverde/casaverde_server/main.rs/methods",
-    "Casaverde/casaverde_server/casaverde_server.md",
-    "Casaverde/casaverde_app/main.rs/main.rs.md",
-    "Casaverde/casaverde_server/Untitled",
-    "Casaverde/casaverde_app/casaverde_app.md",
-    "casaverde design map.canvas",
-    "Casaverde/casaverde_app/ui.rs/ui.rs.md",
-    "Casaverde/casaverde_app/tui.rs/tui.rs.md",
-    "Casaverde/casaverde_app/tui.rs/methods/render_tui.md",
-    "Casaverde/casaverde_app/touch.rs/touch.rs.md",
-    "Casaverde/casaverde_app/main.rs/methods/run_tui.md",
-    "Casaverde/casaverde_app/main.rs/methods/main.md",
-    "Casaverde/casaverde_app/devices.rs/devices.rs.md",
-    "Casaverde/casaverde_controller",
-    "Casaverde/casaverde_server/cache.rs",
+    "assets/pictures/75HC595-pinout.png",
+    "assets/75HC595-pinout.png",
+    "75HC595-pinout.png",
+    "Casaverde Design Concepts/Automation Ideas.md",
+    "Casaverde Design Concepts/Casaverde Design Concept.md",
+    "Casaverde/casaverde_controller/serial.rs/methods/send_command.md",
+    "Casaverde/casaverde_controller/serial.rs/methods/init_serial.md",
+    "Casaverde/casaverde_controller/serial.rs/serial.rs.md",
+    "Casaverde/casaverde_controller/serial.rs/methods",
+    "Casaverde/casaverde_controller/controller.rs/controller.rs.md",
+    "Casaverde/casaverde_controller/main.rs/main.rs.md",
+    "Casaverde/casaverde_controller/main.rs/methods/main.md",
+    "Casaverde/casaverde_controller/controller.rs/enums/Command.md",
+    "Casaverde/casaverde_controller/controller.rs/methods/process_readings.md",
+    "Casaverde/casaverde_controller/controller.rs/structs/CachedData.md",
+    "Casaverde/casaverde_controller/controller.rs/structs/DeviceReading.md",
+    "Casaverde/casaverde_controller/config.rs/config.rs.md",
+    "Casaverde/casaverde_controller/controller.rs/enums",
+    "Casaverde/casaverde_controller/controller.rs/structs",
+    "Casaverde/casaverde_controller/controller.rs/methods",
+    "Casaverde/casaverde_controller/casaverde_controller.md",
+    "Casaverde/casaverde_controller/config.toml.md",
+    "Casaverde/casaverde_controller/config.rs/structs/Config.md",
+    "Casaverde/casaverde_controller/config.rs/methods/load_config.md",
+    "Casaverde/casaverde_controller/config.rs/methods/get_hostname.md",
+    "Casaverde/casaverde_controller/main.rs/methods/get_hostname.md",
+    "Casaverde/casaverde_controller/config.rs/structs",
+    "Casaverde/casaverde_controller/config.rs/methods",
+    "Casaverde/casaverde_controller/client.rs/client.rs.md",
+    "Casaverde/casaverde_controller/client.rs/methods/fetch_readings.md",
+    "Casaverde Design Concepts/device a.md",
+    "Casaverde/casaverde_controller/client.rs/methods/build_secure_client.md",
+    "Casaverde Design Concepts",
+    "Casaverde/casaverde_controller/client.rs/methods",
+    "Casaverde/casaverde_controller/lib.rs.md",
+    "Casaverde/casaverde_controller/serial.rs",
+    "Casaverde/casaverde_controller/controller.rs",
+    "Casaverde/casaverde_controller/main.rs/structs/CachedData.md",
+    "Casaverde Design Concepts/casaverde design map.canvas",
     "assets/pictures/dataflow_casaverde.png"
   ]
 }

@@ -1,0 +1,1 @@
+Asynchronously fetches temperature readings from the temps endpoint of the specified server using the provided client, returning a vector of CachedData.

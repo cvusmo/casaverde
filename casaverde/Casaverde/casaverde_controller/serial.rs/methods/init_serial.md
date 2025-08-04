@@ -1,0 +1,1 @@
+Initializes a serial port connection with the specified port_name and baud_rate with error handling for port opening failures.

@@ -1,0 +1,1 @@
+The asynchronous entry point, initializing logging, loading configuration, setting up a secure HTTP client, establishing a serial communication with the micro controller and entering a loop to fetch data, process commands, and send them every 5 seconds.
