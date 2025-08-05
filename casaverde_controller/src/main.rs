@@ -10,7 +10,7 @@ use env_logger::{Builder, Target};
 
 use casaverde_controller::config;
 use casaverde_controller::client;
-use casaverde_controller::controller::{Command, process_remote_readings, process_local_readings};
+use casaverde_controller::controller::{Command, process_remote_readings};
 use casaverde_controller::gpio;
 use casaverde_controller::serial::{init_serial, send_command};
 
@@ -41,8 +41,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Process both remote and local data
         let remote_commands = process_remote_readings(&readings, &config.controller_id);
-        let local_commands = process_local_readings(local_temp, &config.controller_id);
-        let commands: Vec<Command> = remote_commands.into_iter().chain(local_commands).collect();
+        //let local_commands = process_local_readings(local_temp, &config.controller_id);
+        //let commands: Vec<Command> = remote_commands.into_iter().chain(local_commands).collect();
+        let commands: Vec<Command> = remote_commands.into_iter().collect(); // Use only remote commands
         info!("Generated commands: {commands:?}");
 
         // Send commands to casaverde_server and execute locally
