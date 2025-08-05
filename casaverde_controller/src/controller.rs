@@ -69,38 +69,62 @@ pub enum Command {
 //commands
 //}
 
-// Process remote server temperature readings
 pub fn process_remote_readings(readings: &[CachedData], controller_id: &str) -> Vec<Command> {
     let mut commands = Vec::new();
+    let mut cpu_temp = None;
+    let mut gpu_temp = None;
 
     for reading in readings {
         for device in &reading.devices {
             if let Some(temp) = device.value {
-                info!(
-                    "Temperature {}°C for {} on {}: {}",
-                    temp,
-                    device.id,
-                    reading.client_id,
-                    if temp > 50.0 {
-                        "Cooling on (Blue LED)"
-                    } else {
-                        "Cooling off (Red LED)"
-                    }
-                );
-
                 if device.id == "blackbeard-cpu" {
-                    if temp > 50.0 {
-                        commands.push(Command::TurnOffCooling("INT1".to_string())); // Red LED off
-                        commands.push(Command::TurnOnCooling("INT2".to_string()));
-                    // Blue LED on
-                    } else {
-                        commands.push(Command::TurnOnCooling("INT1".to_string())); // Red LED on
-                        commands.push(Command::TurnOffCooling("INT2".to_string()));
-                        // Blue LED off
-                    }
+                    cpu_temp = Some(temp);
+                    info!(
+                        "Temperature {}°C for {} on {}: {}",
+                        temp,
+                        device.id,
+                        reading.client_id,
+                        if temp > 50.0 {
+                            "Cooling on (Blue LED)"
+                        } else {
+                            "Cooling off"
+                        }
+                    );
+                } else if device.id == "blackbeard-gpu" {
+                    gpu_temp = Some(temp);
+                    info!(
+                        "Temperature {}°C for {} on {}: {}",
+                        temp,
+                        device.id,
+                        reading.client_id,
+                        if temp > 41.0 {
+                            "Cooling on (Red LED)"
+                        } else {
+                            "Cooling off"
+                        }
+                    );
                 }
             }
         }
     }
+
+    match (cpu_temp, gpu_temp) {
+        (Some(cpu), Some(gpu)) => {
+            if cpu > 50.0 {
+                commands.push(Command::TurnOffCooling("INT1".to_string())); // Red LED off
+                commands.push(Command::TurnOnCooling("INT2".to_string())); // Blue LED on
+            }
+            if gpu > 41.0 {
+                commands.push(Command::TurnOnCooling("INT1".to_string())); // Red LED on
+                commands.push(Command::TurnOffCooling("INT2".to_string())); // Blue LED off
+            }
+        }
+        _ => {
+            info!("Missing temperature data for blackbeard-cpu or blackbeard-gpu");
+            commands.push(Command::TurnOffCooling("INT1".to_string())); // Default: Red off
+            commands.push(Command::TurnOffCooling("INT2".to_string())); // Default: Blue off
+        }
+    }
+
     commands
 }
