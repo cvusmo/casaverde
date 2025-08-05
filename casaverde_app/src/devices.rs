@@ -6,11 +6,10 @@ use serde::{Deserialize, Serialize};
 use reqwest::{Client, Certificate};
 use std::fs;
 use std::time::{Duration, Instant};
-use std::process::Command;
 use log::{info, warn, error};
 use std::error::Error;
 use uuid::Uuid;
-use serialport;
+use std::process::Command as ProcessCommand;
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum Sensor {
@@ -47,7 +46,6 @@ pub struct DeviceConfig {
     pub r#type: String,
     pub endpoint: String,
     pub interval: u32,
-    pub serial_port: Option<String>, // Add serial port configuration
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -75,7 +73,7 @@ struct DeviceReading {
 }
 
 #[derive(Deserialize, Serialize, Clone)]
-pub struct Command {
+pub struct AppCommand {
     pub action: String,
     pub device_id: String,
 }
@@ -83,7 +81,7 @@ pub struct Command {
 #[derive(Deserialize, Serialize, Clone)]
 pub struct CommandPayload {
     pub controller_id: String,
-    pub commands: Vec<Command>,
+    pub commands: Vec<AppCommand>,
 }
 
 #[derive(Clone)]
@@ -96,7 +94,6 @@ pub struct DeviceData {
     pub config: DeviceConfigRoot,
     pub client_id: String,
     pub active_count: usize,
-    pub serial_port: Option<Box<dyn serialport::SerialPort>>,
 }
 
 impl DeviceData {
@@ -148,22 +145,6 @@ impl DeviceData {
         states[Sensor::Temperature as usize] = true;
         let device_values = vec![None; device_count];
 
-        // Initialize serial port if specified in config
-        let serial_port = config.configs.iter().find_map(|c| c.serial_port.clone()).and_then(|port_name| {
-            serialport::new(&port_name, 9600)
-                .timeout(Duration::from_millis(1000))
-                .open()
-                .map_err(|e| {
-                    error!("Failed to open serial port {port_name}: {e}");
-                    e
-                })
-                .ok()
-        });
-
-        if serial_port.is_some() {
-            info!("Serial port initialized for LED control");
-        }
-
         info!("DeviceData initialized with {device_count} devices");
         Self {
             states,
@@ -174,7 +155,6 @@ impl DeviceData {
             config,
             client_id: Uuid::new_v4().to_string(),
             active_count: device_count,
-            serial_port,
         }
     }
 
@@ -222,7 +202,7 @@ impl DeviceData {
                     } else {
                         warn!("Failed to send data to {url}: status {}", resp.status());
                         if let Ok(text) = resp.text().await {
-                            warn!("Server response: {text}");
+                            warn!("Server response: {text}"); // Fixed with !
                         }
                     }
                 }
@@ -239,43 +219,6 @@ impl DeviceData {
                     }
                 }
             }
-
-            // Fetch and process commands from server
-            let commands_url = format!("{}/commands", self.config.server);
-            match self.client.get(&commands_url).send().await {
-                Ok(resp) => {
-                    if resp.status().is_success() {
-                        if let Ok(commands) = resp.json::<Vec<(String, Vec<Command>)>>().await {
-                            for (_controller_id, cmds) in commands {
-                                for cmd in cmds {
-                                    self.execute_command(&cmd).await;
-                                }
-                            }
-                        }
-                    } else {
-                        warn!("Failed to fetch commands from {commands_url}: status {}", resp.status());
-                    }
-                }
-                Err(e) => {
-                    error!("Failed to fetch commands from {commands_url}: {e}");
-                }
-            }
-        }
-    }
-
-    async fn execute_command(&mut self, cmd: &Command) {
-        if let Some(ref mut port) = self.serial_port {
-            let command_str = match cmd.action.as_str() {
-                "TurnOnCooling" => format!("ON_{}\n", cmd.device_id),
-                "TurnOffCooling" => format!("OFF_{}\n", cmd.device_id),
-                _ => return,
-            };
-            match port.write_all(command_str.as_bytes()) {
-                Ok(_) => info!("Sent command to serial port: {}", command_str.trim()),
-                Err(e) => error!("Failed to send command to serial port: {e}"),
-            }
-        } else {
-            error!("No serial port available to execute command: {:?}", cmd);
         }
     }
 
@@ -289,7 +232,7 @@ impl DeviceData {
 }
 
 fn get_cpu_temp() -> Option<f32> {
-    match Command::new("sensors").output() {
+    match ProcessCommand::new("sensors").output() {
         Ok(output) => {
             let sensors_str = String::from_utf8_lossy(&output.stdout);
             for line in sensors_str.lines() {
@@ -314,7 +257,7 @@ fn get_cpu_temp() -> Option<f32> {
 }
 
 fn get_gpu_temp() -> Option<f32> {
-    match Command::new("nvidia-smi")
+    match ProcessCommand::new("nvidia-smi")
         .arg("--query-gpu=temperature.gpu")
         .arg("--format=csv,noheader")
         .output()

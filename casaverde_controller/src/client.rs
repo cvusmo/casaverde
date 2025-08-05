@@ -9,13 +9,13 @@ use reqwest::{Client, Certificate};
 use serde::Serialize;
 use std::fs;
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct CommandPayload {
     pub controller_id: String,
     pub commands: Vec<CommandData>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct CommandData {
     pub action: String,
     pub device_id: String,

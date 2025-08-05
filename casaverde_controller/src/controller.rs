@@ -49,9 +49,23 @@ pub fn process_local_readings(local_temp: Option<f32>, controller_id: &str) -> V
             commands.push(Command::TurnOffCooling("INT2".to_string()));
         }
     } else {
-        info!("Error: No temperature reading for {controller_id}. Both OFF.");
+        // TESTMODE: no sensor is wired
+        info!("No temperature sensor detected for {controller_id}. Testing mode:");
+        info!("TEST OFF - Simulating both LEDs off");
         commands.push(Command::TurnOffCooling("INT1".to_string()));
         commands.push(Command::TurnOffCooling("INT2".to_string()));
+
+        static mut CYCLE: bool = false;
+        unsafe {
+            if CYCLE {
+                info!("TEST ON - Simulating INT1 (Red LED) on");
+                commands.push(Command::TurnOnCooling("INT1".to_string()));
+            } else {
+                info!("TEST OFF - Simulating INT2 (Blue LED) off");
+                commands.push(Command::TurnOffCooling("INT2".to_string()));
+            }
+            CYCLE = !CYCLE;
+        }
     }
 
     commands

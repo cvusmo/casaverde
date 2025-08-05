@@ -1,23 +1,26 @@
 // Copyright 2025 Nicholas Jordan. All Rights Reserved.
 // github.com/cvusmo/casaverde/casaverde_controller
-// src/serial.rs - USB serial communication with UNO R3
+// src/serial.rs -
 
 use crate::controller::Command;
 use log::info;
 use serialport;
 
 pub fn init_serial(
-    port_name: &str,
-    baud_rate: u32,
+    config: &crate::config::Config,
 ) -> Result<Box<dyn serialport::SerialPort>, Box<dyn std::error::Error>> {
-    let port = serialport::new(port_name, baud_rate)
+    let port_name = config.serial_port.as_ref().ok_or_else(|| {
+        log::error!("Serial port not configured in config.toml");
+        std::io::Error::new(std::io::ErrorKind::NotFound, "Serial port not found")
+    })?;
+    let port = serialport::new(port_name, 9600)
         .timeout(std::time::Duration::from_millis(1000))
         .open()
         .map_err(|e| {
-            log::error!("Failed to open serial port {port_name}: {e}");
+            log::error!("Failed to open serial port {}: {e}", port_name);
             e
         })?;
-    info!("Serial port {port_name} initialized at {baud_rate} baud");
+    info!("Serial port {} initialized at 9600 baud", port_name);
     Ok(port)
 }
 
