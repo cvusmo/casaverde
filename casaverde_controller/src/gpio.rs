@@ -4,9 +4,9 @@
 
 use std::fs::File;
 use std::io::Read;
-use std::io::Write;
-use std::thread;
-use std::time::Duration;
+//use std::io::Write;
+//use std::thread;
+//use std::time::Duration;
 
 pub fn initialize_gpio() {
     //let mut gpio_export = File::create("/sys/class/gpio/export").unwrap();
