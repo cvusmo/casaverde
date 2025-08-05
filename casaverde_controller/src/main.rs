@@ -9,6 +9,7 @@ use casaverde_controller::config;
 use casaverde_controller::client;
 use casaverde_controller::controller;
 use casaverde_controller::gpio;
+use casaverde_controller::serial::{init_serial, send_command};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -17,32 +18,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let config = config::load_config()?;
     let client = client::build_secure_client()?;
-    gpio::initialize_gpio(); // Initialize GPIO for 74HC595
+    let mut port = init_serial("/dev/ttyACM0", 9600)?; // Confirmed port for Uno R3
 
     loop {
-        // Fetch remote readings
+        // Fetch remote readings from casaverde_server
         let readings = client::fetch_readings(&client, &config.server).await?;
+        info!("Fetched readings from server: {:?}", readings);
         
         // Read local temperature from DS18B20
         let local_temp = gpio::read_temperature();
+        info!("Local temperature: {:?}", local_temp);
 
         // Process both remote and local data
         let remote_commands = controller::process_remote_readings(&readings, &config.controller_id);
-        let local_commands = controller::process_local_readings(local_temp, &config.controller_id);
+        let local_commands = process_local_readings(local_temp, &config.controller_id);
         let commands: Vec<controller::Command> = remote_commands.into_iter().chain(local_commands).collect();
+        info!("Generated commands: {:?}", commands);
 
-        // Execute commands
-        for cmd in commands {
-            match cmd {
-                controller::Command::TurnOnCooling(id) => {
-                    info!("Turning on cooling for {}", id);
-                    gpio::shift_out(0x01); // Set Q0 high (relay ON)
-                }
-                controller::Command::TurnOffCooling(id) => {
-                    info!("Turning off cooling for {}", id);
-                    gpio::shift_out(0x00); // Set Q0 low (relay OFF)
-                }
-            }
+        // Execute commands via serial to Uno R3
+        for cmd in &commands {
+            send_command(&mut *port, cmd.clone())?;
         }
 
         tokio::time::sleep(Duration::from_secs(5)).await;

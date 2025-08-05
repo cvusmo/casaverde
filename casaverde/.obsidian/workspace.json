@@ -11,17 +11,14 @@
             "id": "99e7f25afb18739f",
             "type": "leaf",
             "state": {
-              "type": "canvas",
+              "type": "markdown",
               "state": {
-                "file": "Casaverde Design Concepts/casaverde design map.canvas",
-                "viewState": {
-                  "x": 2192.676178160141,
-                  "y": 3270.157367446478,
-                  "zoom": -0.9999999999999999
-                }
+                "file": "Casaverde/casaverde_server/casaverde_server.md",
+                "mode": "source",
+                "source": false
               },
-              "icon": "lucide-layout-dashboard",
-              "title": "casaverde design map"
+              "icon": "lucide-file",
+              "title": "casaverde_server"
             }
           }
         ]
@@ -173,15 +170,16 @@
   },
   "active": "99e7f25afb18739f",
   "lastOpenFiles": [
+    "Casaverde/casaverde_controller/casaverde_controller.md",
+    "Casaverde/casaverde_app/casaverde_app.md",
+    "Casaverde Design Concepts/casaverde design map.canvas",
     "assets/pictures/rpi5_gpio_pinout.png",
     "Casaverde Design Concepts/Casaverde Design Concept.md",
-    "Casaverde Design Concepts/casaverde design map.canvas",
     "assets/pictures/A000066-pinout-115778796.png",
     "assets/pictures/uno_r3_elegoo_pin-1959864559.jpg",
     "assets/pictures/arduino.jpg",
     "Pasted image 20250804065247.png",
     "Pasted image 20250804065223.png",
-    "Casaverde/casaverde_app/casaverde_app.md",
     "assets/pictures/75HC595-pinout.png",
     "assets/75HC595-pinout.png",
     "75HC595-pinout.png",
@@ -201,7 +199,6 @@
     "Casaverde/casaverde_controller/controller.rs/enums",
     "Casaverde/casaverde_controller/controller.rs/structs",
     "Casaverde/casaverde_controller/controller.rs/methods",
-    "Casaverde/casaverde_controller/casaverde_controller.md",
     "Casaverde/casaverde_controller/config.toml.md",
     "Casaverde/casaverde_controller/config.rs/structs/Config.md",
     "Casaverde/casaverde_controller/config.rs/methods/load_config.md",

@@ -27,12 +27,12 @@ pub fn send_command(
 ) -> Result<(), Box<dyn std::error::Error>> {
     match cmd {
         Command::TurnOnCooling(id) => {
-            let command = format!("COOL_ON_{id}\n");
+            let command = format!("ON_{id}\n");
             port.write_all(command.as_bytes())?;
             info!("Sent: {}", command.trim());
         }
         Command::TurnOffCooling(id) => {
-            let command = format!("COOL_OFF_{id}\n");
+            let command = format!("OFF_{id}\n");
             port.write_all(command.as_bytes())?;
             info!("Sent: {}", command.trim());
         }

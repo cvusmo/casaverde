@@ -29,20 +29,29 @@ pub fn process_local_readings(local_temp: Option<f32>, controller_id: &str) -> V
 
     if let Some(temp) = local_temp {
         let local_device_id = "local_sensor".to_string();
-        if temp > 45.0 {
+        if temp > 40.0 {
             info!(
-                "Local temperature above 45°C for {local_device_id} on {controller_id}: {temp}. Turn on cooling."
+                "Local temperature above 40°C for {local_device_id} on {controller_id}: {temp}. Turning on INT1 (Red LED)."
             );
-            commands.push(Command::TurnOnCooling(local_device_id.clone()));
-        } else if temp < 44.0 {
+            commands.push(Command::TurnOnCooling("INT1".to_string())); // INT1 ON for Red
+            commands.push(Command::TurnOffCooling("INT2".to_string())); // INT2 OFF for Blue
+        } else if temp < 39.0 {
             info!(
-                "Local temperature below 44°C for {local_device_id} on {controller_id}: {temp}. Turn off cooling."
+                "Local temperature below 39°C for {local_device_id} on {controller_id}: {temp}. Turning on INT2 (Blue LED)."
             );
-            commands.push(Command::TurnOffCooling(local_device_id));
+            commands.push(Command::TurnOffCooling("INT1".to_string())); // INT1 OFF for Red
+            commands.push(Command::TurnOnCooling("INT2".to_string())); // INT2 ON for Blue
         } else {
-            info!("Local temperature stable for {local_device_id} on {controller_id}: {temp}.");
-            // No command for stable state, but can be added if needed
+            info!(
+                "Local temperature stable for {local_device_id} on {controller_id}: {temp}. Both OFF."
+            );
+            commands.push(Command::TurnOffCooling("INT1".to_string())); // INT1 OFF
+            commands.push(Command::TurnOffCooling("INT2".to_string())); // INT2 OFF
         }
+    } else {
+        info!("Error: No temperature reading for {controller_id}. Both OFF.");
+        commands.push(Command::TurnOffCooling("INT1".to_string()));
+        commands.push(Command::TurnOffCooling("INT2".to_string()));
     }
 
     commands
@@ -57,7 +66,7 @@ pub fn process_remote_readings(readings: &[CachedData], _controller_id: &str) ->
             if let Some(temp) = device.value {
                 if temp > 50.0 {
                     info!(
-                        "Temperature above 50°C for {} on {}: {}. Turn on cooling.",
+                        "Temperature above 50°C for {} on {}: {}. Turning on cooling.",
                         device.id, data.client_id, temp
                     );
                     commands.push(Command::TurnOnCooling(device.id.clone()));
@@ -67,13 +76,9 @@ pub fn process_remote_readings(readings: &[CachedData], _controller_id: &str) ->
                         device.id, data.client_id, temp
                     );
                     commands.push(Command::TurnOffCooling(device.id.clone()));
-                    // TODO: Implement energy optimization (500 kWh/30 days)
                 }
             }
         }
     }
     commands
 }
-
-// TODO: create algorithm to update process_reading based off cached values and analyzing the data
-// this algorithm will be done by the server, not by the controller.

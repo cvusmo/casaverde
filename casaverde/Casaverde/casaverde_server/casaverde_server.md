@@ -9,6 +9,3 @@ The [[casaverde_server]] binary is the central server component of the Casaverde
 - [[handlers.rs]]
 - [[Casaverde/casaverde_server/main.rs/main.rs|main.rs]]
 - [[models.rs]]
-
-
-
