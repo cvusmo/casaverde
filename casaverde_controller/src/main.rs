@@ -2,7 +2,6 @@
 // github.com/cvusmo/casaverde/casaverde_controller
 // src/main.rs - Entry point for casaverde_controller
 
-// src/main.rs
 use log::info;
 use std::time::Duration;
 
@@ -36,10 +35,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let commands: Vec<Command> = remote_commands.into_iter().chain(local_commands).collect();
         info!("Generated commands: {:?}", commands);
 
-        // Send commands to casaverde_server and execute locally
-        client::send_commands(&client, &config.server, &commands, &config.controller_id).await?;
+        // Send commands to casaverde_server (removed extra controller_id argument)
+        client::send_commands(&client, &config.server, &commands).await?;
         for cmd in &commands {
-            send_command(&mut *port, cmd.clone())?;
+            send_command(&mut *port, cmd)?; // Removed .clone(), passing reference
         }
 
         tokio::time::sleep(Duration::from_secs(5)).await;

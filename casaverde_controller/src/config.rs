@@ -10,6 +10,7 @@ use std::fs;
 pub struct Config {
     pub server: String,
     pub controller_id: String,
+    pub serial_port: Option<String>,
 }
 
 pub fn load_config() -> Result<Config, Box<dyn std::error::Error>> {

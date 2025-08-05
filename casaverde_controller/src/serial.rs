@@ -26,7 +26,7 @@ pub fn init_serial(
 
 pub fn send_command(
     port: &mut dyn serialport::SerialPort,
-    cmd: Command,
+    cmd: &Command,
 ) -> Result<(), Box<dyn std::error::Error>> {
     match cmd {
         Command::TurnOnCooling(id) => {
