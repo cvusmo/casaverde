@@ -17,7 +17,7 @@ pub struct CachedData {
     pub devices: Vec<DeviceReading>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Command {
     TurnOnCooling(String),
     TurnOffCooling(String),
@@ -33,20 +33,20 @@ pub fn process_local_readings(local_temp: Option<f32>, controller_id: &str) -> V
             info!(
                 "Local temperature above 40°C for {local_device_id} on {controller_id}: {temp}. Turning on INT1 (Red LED)."
             );
-            commands.push(Command::TurnOnCooling("INT1".to_string())); // INT1 ON for Red
-            commands.push(Command::TurnOffCooling("INT2".to_string())); // INT2 OFF for Blue
+            commands.push(Command::TurnOnCooling("INT1".to_string())); // Red LED
+            commands.push(Command::TurnOffCooling("INT2".to_string())); // Blue LED
         } else if temp < 39.0 {
             info!(
                 "Local temperature below 39°C for {local_device_id} on {controller_id}: {temp}. Turning on INT2 (Blue LED)."
             );
-            commands.push(Command::TurnOffCooling("INT1".to_string())); // INT1 OFF for Red
-            commands.push(Command::TurnOnCooling("INT2".to_string())); // INT2 ON for Blue
+            commands.push(Command::TurnOffCooling("INT1".to_string())); // Red LED
+            commands.push(Command::TurnOnCooling("INT2".to_string())); // Blue LED
         } else {
             info!(
                 "Local temperature stable for {local_device_id} on {controller_id}: {temp}. Both OFF."
             );
-            commands.push(Command::TurnOffCooling("INT1".to_string())); // INT1 OFF
-            commands.push(Command::TurnOffCooling("INT2".to_string())); // INT2 OFF
+            commands.push(Command::TurnOffCooling("INT1".to_string()));
+            commands.push(Command::TurnOffCooling("INT2".to_string()));
         }
     } else {
         info!("Error: No temperature reading for {controller_id}. Both OFF.");

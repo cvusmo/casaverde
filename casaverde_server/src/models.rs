@@ -15,3 +15,15 @@ pub struct SensorReading {
     pub client_id: String,
     pub devices: Vec<DeviceReading>,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Command {
+    pub action: String,
+    pub device_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CommandPayload {
+    pub controller_id: String,
+    pub commands: Vec<Command>,
+}

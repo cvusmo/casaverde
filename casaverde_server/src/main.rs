@@ -2,7 +2,7 @@
 // github.com/cvusmo/casaverde/casaverde_server
 // src/main.rs
 
-use axum::{routing::get, Router};
+use axum::{routing::{get, post}, Router};
 use axum_server::tls_rustls::RustlsConfig;
 use std::{fs, io};
 use std::net::SocketAddr;
@@ -40,7 +40,8 @@ async fn main() -> io::Result<()> {
 
     let app = Router::new()
         .route("/temps", get(handlers::get_temperatures))
-        .route("/sensor_data", get(handlers::get_all_data).post(handlers::post_sensor_data));
+        .route("/sensor_data", get(handlers::get_all_data).post(handlers::post_sensor_data))
+        .route("/commands", get(handlers::get_commands).post(handlers::post_commands));
 
     axum_server::bind_rustls(addr, config)
         .serve(app.into_make_service())
