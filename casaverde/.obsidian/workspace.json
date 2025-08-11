@@ -170,6 +170,8 @@
   },
   "active": "99e7f25afb18739f",
   "lastOpenFiles": [
+    "assets/pictures/casaverde_logo.xcf",
+    "assets/images/casaverde_logo.png",
     "Casaverde/casaverde_controller/casaverde_controller.md",
     "Casaverde/casaverde_app/casaverde_app.md",
     "Casaverde Design Concepts/casaverde design map.canvas",
@@ -214,7 +216,6 @@
     "Casaverde/casaverde_controller/client.rs/methods",
     "Casaverde/casaverde_controller/lib.rs.md",
     "Casaverde/casaverde_controller/serial.rs",
-    "Casaverde/casaverde_controller/controller.rs",
-    "assets/pictures/dataflow_casaverde.png"
+    "Casaverde/casaverde_controller/controller.rs"
   ]
 }

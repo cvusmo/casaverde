@@ -19,8 +19,10 @@ pub struct CachedData {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Command {
-    TurnOnCooling(String),
-    TurnOffCooling(String),
+    TurnOnCooling(String),  // Red LEDturn on/off cooling
+    TurnOffCooling(String), // Blue LED Remove to open up 1 relay for something else
+    OpenValve(String),      // Yellow LED
+    CloseValve(String),     // Green LED reverse polarity
 }
 
 // Process local DS18B20 temperature readings
@@ -69,6 +71,7 @@ pub enum Command {
 //commands
 //}
 
+// FIX: Solenoid Valve needs to be a mutable device
 pub fn process_remote_readings(readings: &[CachedData], controller_id: &str) -> Vec<Command> {
     let mut commands = Vec::new();
     let mut cpu_temp = None;
@@ -84,7 +87,7 @@ pub fn process_remote_readings(readings: &[CachedData], controller_id: &str) -> 
                         temp,
                         device.id,
                         reading.client_id,
-                        if temp > 50.0 {
+                        if temp > 40.0 {
                             "Cooling on (Blue LED)"
                         } else {
                             "Cooling off"
@@ -97,7 +100,7 @@ pub fn process_remote_readings(readings: &[CachedData], controller_id: &str) -> 
                         temp,
                         device.id,
                         reading.client_id,
-                        if temp > 41.0 {
+                        if temp > 40.0 {
                             "Cooling on (Red LED)"
                         } else {
                             "Cooling off"
@@ -110,19 +113,36 @@ pub fn process_remote_readings(readings: &[CachedData], controller_id: &str) -> 
 
     match (cpu_temp, gpu_temp) {
         (Some(cpu), Some(gpu)) => {
-            if cpu > 50.0 {
-                commands.push(Command::TurnOffCooling("INT1".to_string())); // Red LED off
-                commands.push(Command::TurnOnCooling("INT2".to_string())); // Blue LED on
-            }
-            if gpu > 41.0 {
-                commands.push(Command::TurnOnCooling("INT1".to_string())); // Red LED on
-                commands.push(Command::TurnOffCooling("INT2".to_string())); // Blue LED off
+            if cpu > 40.0 && gpu > 40.0 {
+                commands.push(Command::TurnOnCooling("INT1".to_string())); // Red ON
+                commands.push(Command::TurnOnCooling("INT2".to_string())); // Blue ON
+                commands.push(Command::OpenValve("VALVE1".to_string())); // Yellow ON
+                info!("Cooling activate: solenoid valve opened.");
+            } else if cpu <= 40.0 && gpu <= 40.0 {
+                commands.push(Command::TurnOffCooling("INT1".to_string())); // Red off
+                commands.push(Command::TurnOffCooling("INT2".to_string())); // Blue off
+                commands.push(Command::CloseValve("VALVE2".to_string())); // Green ON
+                info!("Cooling deactivated: solenoid valve closed.");
+            } else {
+                if gpu > 40.0 {
+                    commands.push(Command::TurnOnCooling("INT1".to_string()));
+                } else {
+                    commands.push(Command::TurnOffCooling("INT2".to_string()));
+                }
+                if cpu > 40.0 {
+                    commands.push(Command::TurnOnCooling("INT2".to_string()));
+                } else {
+                    commands.push(Command::TurnOffCooling("INT2".to_string()));
+                }
+                info!("Mixed CPU/GPU temperatures: Maintaining current to solenoid valve state");
             }
         }
         _ => {
             info!("Missing temperature data for blackbeard-cpu or blackbeard-gpu");
-            commands.push(Command::TurnOffCooling("INT1".to_string())); // Default: Red off
-            commands.push(Command::TurnOffCooling("INT2".to_string())); // Default: Blue off
+            commands.push(Command::TurnOffCooling("INT1".to_string())); // Red off
+            commands.push(Command::TurnOffCooling("INT2".to_string())); // Blue off
+            commands.push(Command::CloseValve("VALVE2".to_string())); // Green ON
+            info!("No valid data: Closing solenoid valve");
         }
     }
 
