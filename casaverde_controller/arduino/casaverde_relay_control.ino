@@ -1,8 +1,8 @@
 // casaverde_relay_control
-const int relay1 = 2; // INT1 (Red LED)
-const int relay2 = 3; // INT2 (Blue LED)
-const int relay3 = 4; // VALVE1 (Yellow LED)
-const int relay4 = 5; // VALVE2 (Green LED)
+const int relay1 = 2; // INT1 (Red LED, CPU)
+const int relay2 = 3; // INT2 (Blue LED, GPU)
+const int relay3 = 4; // VALVE1 (Yellow LED, OPEN)
+const int relay4 = 5; // VALVE2 (Green LED, CLOSE)
 
 void setup() {
   Serial.begin(9600);
@@ -35,25 +35,25 @@ void loop() {
     } else if (command == "OPEN_VALVE1") {
       digitalWrite(relay4, LOW);
       digitalWrite(relay3, HIGH);
-      delay(30);
+      delay(3000);
       digitalWrite(relay3, LOW);
       Serial.println("Solenoid Open: Yellow LED");
     } else if (command == "CLOSE_VALVE2") {
       digitalWrite(relay3, LOW);
       digitalWrite(relay4, HIGH);
-      delay(30);
+      delay(3000);
       digitalWrite(relay4, LOW);
       Serial.println("Solenoid Closed: Green LED");
     } else if (command == "TEST_CYCLE") {
       digitalWrite(relay4, LOW);
       digitalWrite(relay3, HIGH);
-      delay(30); // OPEN VALVE
+      delay(3000); // OPEN VALVE
       digitalWrite(relay3, LOW);
       Serial.println("Solenoid OPEN: TEST TEST TEST");
       delay(10000);
       digitalWrite(relay3, LOW);
       digitalWrite(relay4, HIGH);
-      delay(30); // CLOSE VALVE
+      delay(3000); // CLOSE VALVE
       digitalWrite(relay4, LOW);
       Serial.println("Solenoid CLOSED: TEST TEST TEST");
       Serial.println("TEST COMPLETE");

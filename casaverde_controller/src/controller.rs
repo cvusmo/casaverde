@@ -19,8 +19,8 @@ pub struct CachedData {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Command {
-    TurnOnCooling(String),  // Red LEDturn on/off cooling
-    TurnOffCooling(String), // Blue LED Remove to open up 1 relay for something else
+    TurnOnCooling(String),  // Red LED turn on/off CPU cooling
+    TurnOffCooling(String), // Blue LED turn on/off GPU cooling
     OpenValve(String),      // Yellow LED
     CloseValve(String),     // Green LED reverse polarity
 }
@@ -81,14 +81,15 @@ pub fn process_remote_readings(readings: &[CachedData], controller_id: &str) -> 
         for device in &reading.devices {
             if let Some(temp) = device.value {
                 if device.id == "blackbeard-cpu" {
-                    cpu_temp = Some(temp);
+                    cpu_temp = Some(cpu_temp.unwrap_or(f32::MIN).max(temp));
+                    //cpu_temp = Some(temp);
                     info!(
                         "Temperature {}°C for {} on {}: {}",
                         temp,
                         device.id,
                         reading.client_id,
                         if temp > 40.0 {
-                            "Cooling on (Blue LED)"
+                            "Cooling on (Red LED)"
                         } else {
                             "Cooling off"
                         }
@@ -101,7 +102,7 @@ pub fn process_remote_readings(readings: &[CachedData], controller_id: &str) -> 
                         device.id,
                         reading.client_id,
                         if temp > 40.0 {
-                            "Cooling on (Red LED)"
+                            "Cooling on (Blue LED)"
                         } else {
                             "Cooling off"
                         }
@@ -121,14 +122,14 @@ pub fn process_remote_readings(readings: &[CachedData], controller_id: &str) -> 
                 commands.push(Command::TurnOffCooling("INT1".to_string())); // Red off
                 commands.push(Command::CloseValve("VALVE2".to_string())); // Green ON
                 info!("Cooling deactivated: solenoid valve closed.");
+            }
+
+            if gpu > 40.0 {
+                commands.push(Command::TurnOnCooling("INT2".to_string()));
+                info!("GPU temp above 40");
             } else {
-                if gpu > 40.0 {
-                    commands.push(Command::TurnOnCooling("INT1".to_string()));
-                    info!("GPU temp above 40");
-                } else {
-                    commands.push(Command::TurnOffCooling("INT2".to_string()));
-                    info!("GPU temp below 40");
-                }
+                commands.push(Command::TurnOffCooling("INT2".to_string()));
+                info!("GPU temp below 40");
             }
         }
         _ => {
