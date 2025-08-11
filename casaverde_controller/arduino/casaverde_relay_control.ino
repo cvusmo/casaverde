@@ -36,14 +36,27 @@ void loop() {
       digitalWrite(relay4, LOW);
       digitalWrite(relay3, HIGH);
       delay(30);
-      digitalWrite(relay4, LOW);
+      digitalWrite(relay3, LOW);
       Serial.println("Solenoid Open: Yellow LED");
     } else if (command == "CLOSE_VALVE2") {
       digitalWrite(relay3, LOW);
       digitalWrite(relay4, HIGH);
       delay(30);
-      digitalWrite(relay3, LOW);
+      digitalWrite(relay4, LOW);
       Serial.println("Solenoid Closed: Green LED");
+    } else if (command == "TEST_CYCLE") {
+      digitalWrite(relay4, LOW);
+      digitalWrite(relay3, HIGH);
+      delay(30); // OPEN VALVE
+      digitalWrite(relay3, LOW);
+      Serial.println("Solenoid OPEN: TEST TEST TEST");
+      delay(10000);
+      digitalWrite(relay3, LOW);
+      digitalWrite(relay4, HIGH);
+      delay(30); // CLOSE VALVE
+      digitalWrite(relay4, LOW);
+      Serial.println("Solenoid CLOSED: TEST TEST TEST");
+      Serial.println("TEST COMPLETE");
     } else {
       Serial.println("Unknown command: " + command);
     }

@@ -115,26 +115,20 @@ pub fn process_remote_readings(readings: &[CachedData], controller_id: &str) -> 
         (Some(cpu), Some(gpu)) => {
             if cpu > 40.0 {
                 commands.push(Command::TurnOnCooling("INT1".to_string())); // Red ON
-                commands.push(Command::TurnOnCooling("INT2".to_string())); // Blue ON
                 commands.push(Command::OpenValve("VALVE1".to_string())); // Yellow ON
                 info!("Cooling activate: solenoid valve opened.");
             } else if cpu <= 40.0 {
                 commands.push(Command::TurnOffCooling("INT1".to_string())); // Red off
-                commands.push(Command::TurnOffCooling("INT2".to_string())); // Blue off
                 commands.push(Command::CloseValve("VALVE2".to_string())); // Green ON
                 info!("Cooling deactivated: solenoid valve closed.");
             } else {
                 if gpu > 40.0 {
                     commands.push(Command::TurnOnCooling("INT1".to_string()));
+                    info!("GPU temp above 40");
                 } else {
                     commands.push(Command::TurnOffCooling("INT2".to_string()));
+                    info!("GPU temp below 40");
                 }
-                if cpu > 40.0 {
-                    commands.push(Command::TurnOnCooling("INT2".to_string()));
-                } else {
-                    commands.push(Command::TurnOffCooling("INT2".to_string()));
-                }
-                info!("Mixed CPU/GPU temperatures: Maintaining current to solenoid valve state");
             }
         }
         _ => {
