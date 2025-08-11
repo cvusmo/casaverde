@@ -52,7 +52,7 @@ async fn main() -> io::Result<()> {
 
 fn get_server_addr() -> SocketAddr {
     std::env::var("SERVER_IP")
-        .unwrap_or("10.0.0.12:3000".to_string())
+        .unwrap_or("10.0.0.12:3001".to_string())
         .parse()
         .expect("Invalid SERVER_IP format")
 }
