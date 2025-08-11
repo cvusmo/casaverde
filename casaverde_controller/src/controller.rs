@@ -113,12 +113,12 @@ pub fn process_remote_readings(readings: &[CachedData], controller_id: &str) -> 
 
     match (cpu_temp, gpu_temp) {
         (Some(cpu), Some(gpu)) => {
-            if cpu > 40.0 && gpu > 40.0 {
+            if cpu > 40.0 {
                 commands.push(Command::TurnOnCooling("INT1".to_string())); // Red ON
                 commands.push(Command::TurnOnCooling("INT2".to_string())); // Blue ON
                 commands.push(Command::OpenValve("VALVE1".to_string())); // Yellow ON
                 info!("Cooling activate: solenoid valve opened.");
-            } else if cpu <= 40.0 && gpu <= 40.0 {
+            } else if cpu <= 40.0 {
                 commands.push(Command::TurnOffCooling("INT1".to_string())); // Red off
                 commands.push(Command::TurnOffCooling("INT2".to_string())); // Blue off
                 commands.push(Command::CloseValve("VALVE2".to_string())); // Green ON

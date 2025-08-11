@@ -17,8 +17,8 @@ void setup() {
 }
 
 void loop() {
-  if (Serial.available() > 0 {
-    String command = Serial.readStringUntil('n\');
+  if (Serial.available() > 0) {
+    String command = Serial.readStringUntil('\n');
     command.trim();
     if (command == "ON_INT1") {
       digitalWrite(relay1, HIGH);
@@ -33,15 +33,17 @@ void loop() {
       digitalWrite(relay2, LOW);
       Serial.println("Blue LED turned off");
     } else if (command == "OPEN_VALVE1") {
+      digitalWrite(relay4, LOW);
       digitalWrite(relay3, HIGH);
       delay(30);
       digitalWrite(relay4, LOW);
-      Serial.println("Solenoid Open: YELLOW LED");
+      Serial.println("Solenoid Open: Yellow LED");
     } else if (command == "CLOSE_VALVE2") {
+      digitalWrite(relay3, LOW);
       digitalWrite(relay4, HIGH);
       delay(30);
       digitalWrite(relay3, LOW);
-      Serial.println("Solenoid Closed: GREEN LED");
+      Serial.println("Solenoid Closed: Green LED");
     } else {
       Serial.println("Unknown command: " + command);
     }

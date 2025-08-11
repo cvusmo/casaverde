@@ -40,12 +40,12 @@ pub fn send_command(
             info!("Sent: {}", command.trim());
         }
         Command::OpenValve(id) => {
-            let command = format!("ON_{id}\n");
+            let command = format!("OPEN_{id}\n");
             port.write_all(command.as_bytes())?;
             info!("Sent: {}", command.trim());
         }
         Command::CloseValve(id) => {
-            let command = format!("OFF_{id}\n");
+            let command = format!("CLOSE_{id}\n");
             port.write_all(command.as_bytes())?;
             info!("Sent: {}", command.trim());
         }
