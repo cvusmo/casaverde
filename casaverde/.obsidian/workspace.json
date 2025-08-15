@@ -11,14 +11,17 @@
             "id": "99e7f25afb18739f",
             "type": "leaf",
             "state": {
-              "type": "markdown",
+              "type": "canvas",
               "state": {
-                "file": "Casaverde/casaverde_server/casaverde_server.md",
-                "mode": "source",
-                "source": false
+                "file": "Casaverde Design Concepts/casaverde design map.canvas",
+                "viewState": {
+                  "x": -138,
+                  "y": 3718,
+                  "zoom": -3.8381248614595793
+                }
               },
-              "icon": "lucide-file",
-              "title": "casaverde_server"
+              "icon": "lucide-layout-dashboard",
+              "title": "casaverde design map"
             }
           }
         ]
@@ -170,22 +173,26 @@
   },
   "active": "99e7f25afb18739f",
   "lastOpenFiles": [
+    "Casaverde Design Concepts/device a.md",
+    "Casaverde Design Concepts/device b.md",
+    "Pasted image 20250804065223.png",
+    "Pasted image 20250804065247.png",
+    "Casaverde Design Concepts/casaverde design map.canvas",
+    "Casaverde/casaverde.md",
+    "Casaverde/casaverde_app/casaverde_app.md",
+    "Casaverde/casaverde_controller/casaverde_controller.md",
+    "Casaverde Design Concepts/Automation Ideas.md",
+    "Casaverde Design Concepts/Casaverde Design Concept.md",
+    "Casaverde/casaverde_server/casaverde_server.md",
     "assets/pictures/casaverde_logo.xcf",
     "assets/images/casaverde_logo.png",
-    "Casaverde/casaverde_controller/casaverde_controller.md",
-    "Casaverde/casaverde_app/casaverde_app.md",
-    "Casaverde Design Concepts/casaverde design map.canvas",
     "assets/pictures/rpi5_gpio_pinout.png",
-    "Casaverde Design Concepts/Casaverde Design Concept.md",
     "assets/pictures/A000066-pinout-115778796.png",
     "assets/pictures/uno_r3_elegoo_pin-1959864559.jpg",
     "assets/pictures/arduino.jpg",
-    "Pasted image 20250804065247.png",
-    "Pasted image 20250804065223.png",
     "assets/pictures/75HC595-pinout.png",
     "assets/75HC595-pinout.png",
     "75HC595-pinout.png",
-    "Casaverde Design Concepts/Automation Ideas.md",
     "Casaverde/casaverde_controller/serial.rs/methods/send_command.md",
     "Casaverde/casaverde_controller/serial.rs/methods/init_serial.md",
     "Casaverde/casaverde_controller/serial.rs/serial.rs.md",
@@ -209,13 +216,8 @@
     "Casaverde/casaverde_controller/config.rs/structs",
     "Casaverde/casaverde_controller/config.rs/methods",
     "Casaverde/casaverde_controller/client.rs/client.rs.md",
-    "Casaverde/casaverde_controller/client.rs/methods/fetch_readings.md",
-    "Casaverde Design Concepts/device a.md",
-    "Casaverde/casaverde_controller/client.rs/methods/build_secure_client.md",
     "Casaverde Design Concepts",
     "Casaverde/casaverde_controller/client.rs/methods",
-    "Casaverde/casaverde_controller/lib.rs.md",
-    "Casaverde/casaverde_controller/serial.rs",
-    "Casaverde/casaverde_controller/controller.rs"
+    "Casaverde/casaverde_controller/serial.rs"
   ]
 }
