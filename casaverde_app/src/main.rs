@@ -20,6 +20,8 @@ struct Args {
     tui: bool,
     #[arg(long, default_value = "https://10.0.0.12:3003")]
     server: String,
+    #[arg(long, default_value_t = false)]
+    local_server: bool,
 }
 
 fn main() -> io::Result<()> {
