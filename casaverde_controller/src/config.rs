@@ -1,12 +1,12 @@
-// Copyright 2025 Nicholas Jordan. All Rights Reserved.
+// Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 // github.com/cvusmo/casaverde/casaverde_controller
 // src/config.rs - Configuration loading and hostname utilities
 
 use log::{error, info};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fs;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
     pub server: String,
     pub controller_id: String,

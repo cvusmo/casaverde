@@ -1,7 +1,8 @@
-// Copyright 2025 Nicholas Jordan. All Rights Reserved.
+// Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 // github.com/cvusmo/casaverde/casaverde_app
 // src/devices.rs
 
+use crate::models::{ConfigEntry, ConfigPayload};
 use serde::{Deserialize, Serialize};
 use reqwest::{Client, Certificate};
 use std::fs;
@@ -137,7 +138,7 @@ impl DeviceData {
             .add_root_certificate(cert)
             .use_rustls_tls()
             .min_tls_version(reqwest::tls::Version::TLS_1_3)
-            .danger_accept_invalid_certs(true) // TEMPORARY BYPASS
+            .danger_accept_invalid_certs(true) // NOTE: TEMPORARY BYPASS
             .build()
             .expect("Failed to build secure client");
 
@@ -228,6 +229,16 @@ impl DeviceData {
             self.states[index] = !self.states[index];
             info!("Toggled {} to {}", sensor.name(), self.states[index]);
         }
+    }
+
+    pub async fn fetch_controller_config(&self, controller_id: &str) -> Option<ConfigEntry> {
+        let url = format!("{}/configs/{}", self.config.server, controller_id);
+        self.client.get(&url).send().await.ok()?.json().await.ok()
+    }
+
+    pub async fn update_controller_config(&self, payload: ConfigPayload) {
+        let url = format!("{}/configs", self.config.server);
+        self.client.post(&url).json(&payload).send().await.ok();
     }
 }
 

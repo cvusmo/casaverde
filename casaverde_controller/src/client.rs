@@ -1,9 +1,11 @@
-// Copyright 2025 Nicholas Jordan. All Rights Reserved.
+// Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 // github.com/cvusmo/casaverde/casaverde_controller
 // src/client.rs - HTTP client setup and data fetching
 
 use crate::config;
+use crate::config::Config;
 use crate::controller::{Command, CachedData};
+use crate::models::ConfigEntry;
 use log::{error, info};
 use reqwest::{Client, Certificate};
 use serde::Serialize;
@@ -49,6 +51,19 @@ pub async fn fetch_readings(client: &Client, server: &str) -> Result<Vec<CachedD
     let resp = client.get(&url).send().await?.json::<Vec<CachedData>>().await?;
     info!("Fetched readings from {url}");
     Ok(resp)
+}
+
+pub async fn fetch_config(client: &Client, server: &str, controller_id: &str) -> Result<Config, Box<dyn std::error::Error>> {
+    let url = format!("{server}/configs/{controller_id}");
+    let resp = client.get(&url).send().await?.json::<ConfigEntry>().await?;
+    Ok(Config {
+        server: resp.current.server,
+        controller_id: resp.current.controller_id,
+        serial_port: resp.current.serial_port,
+        light_relay_id: resp.current.light_relay_id,
+        light_on_hours: resp.current.light_on_hours,
+        light_off_hours: resp.current.light_off_hours,
+    })
 }
 
 pub async fn send_commands(client: &Client, server: &str, commands: &[Command]) -> Result<(), Box<dyn std::error::Error>> {

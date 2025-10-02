@@ -1,4 +1,4 @@
-// Copyright 2025 Nicholas Jordan. All Rights Reserved.
+// Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 // github.com/cvusmo/casaverde/casaverde_server
 // src/main.rs
 
@@ -41,7 +41,9 @@ async fn main() -> io::Result<()> {
     let app = Router::new()
         .route("/temps", get(handlers::get_temperatures))
         .route("/sensor_data", get(handlers::get_all_data).post(handlers::post_sensor_data))
-        .route("/commands", get(handlers::get_commands).post(handlers::post_commands));
+        .route("/commands", get(handlers::get_commands).post(handlers::post_commands))
+        .route("/configs/:controller_id", get(handlers::get_configs))
+        .route("/configs", post(handlers::post_configs));
 
     axum_server::bind_rustls(addr, config)
         .serve(app.into_make_service())

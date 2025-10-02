@@ -1,21 +1,22 @@
-// Copyright 2025 Nicholas Jordan. All Rights Reserved.
+// Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 // github.com/cvusmo/casaverde/casaverde_controller
 // src/timer.rs
 
-use crate::client::{send_commands, Client};
+use crate::client::send_commands;
 use crate::controller::Command;
 use crate::serial::send_command;
 use log::{error, info};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::{sync::Mutex, time::sleep};
+use reqwest::Client;
 
 pub async fn run_light_timer(
     relay_id: String,
     on_duration_hours: u64,
     off_duration_hours: u64,
     port: Arc<Mutex<Box<dyn serialport::SerialPort>>>,
-    client: Client,
+    client: Client, 
     server: String,
 ) {
     info!("Starting light timer with ID {}, {}h on / {}h off cycle", relay_id, on_duration_hours, off_duration_hours);
