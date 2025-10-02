@@ -1,4 +1,4 @@
-// Copyright 2025 Nicholas Jordan. All Rights Reserved.
+// Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 // github.com/cvusmo/casaverde/casaverde_server
 // src/main.rs
 
@@ -66,13 +66,11 @@ async fn main() -> io::Result<()> {
 }
 
 fn get_server_addr() -> SocketAddr {
-    let ip = std::env::var("SERVER_IP").unwrap_or("10.11.181.98:3003".to_string()); // Default includes port
+    let ip = std::env::var("SERVER_IP").unwrap_or("10.0.0.6:3003".to_string()); // Default includes port
     ip.parse().unwrap_or_else(|_| {
-        eprintln!("Invalid SERVER_IP format: {}. Using 10.11.181.98:3003", ip);
-        "10.11.181.98:3003"
+        eprintln!("Invalid SERVER_IP format: {}. Using 10.0.0.6:3003", ip);
+        "10.0.0.6:3003"
             .parse()
             .expect("Default IP format invalid")
     })
 }
-
-//server = "https://10.111.181.98:3003"

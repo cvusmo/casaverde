@@ -2,9 +2,7 @@
 // github.com/cvusmo/casaverde/casaverde_server
 // src/cache.rs
 
-use crate::models::{
-    Command, CommandPayload, ConfigData, ConfigEntry, DeviceReading, SensorReading,
-};
+use crate::models::{Command, ConfigData, ConfigEntry, DeviceReading, SensorReading};
 use log::info;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -38,10 +36,10 @@ pub fn insert_temp_cache(client_id: String, data: SensorReading) {
     );
 }
 
-pub fn insert_command_cache(controller_id: String, data: CommandPayload) {
+pub fn insert_command_cache(controller_id: String, commands: Vec<Command>) {
     let mut cache = COMMAND_CACHE.lock().unwrap();
     let timestamp = Instant::now();
-    cache.insert(controller_id.clone(), (data.commands, timestamp));
+    cache.insert(controller_id.clone(), (commands, timestamp));
     info!(
         "Inserted command data for controller {} into cache",
         controller_id

@@ -1,5 +1,5 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
+# Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 # setup.sh for casaverde_server
 # Run on server to set up certificates and firewall
 # Use --test to print the detected IP address and exit
@@ -33,7 +33,7 @@ if [[ "$1" == "--test" ]]; then
     SERVER_IP=""
   fi
 
-  # Default to 10.0.0.12:3003 if no IP found or use environment variable
+  # Default to 10.0.0.6:3003 if no IP found or use environment variable
   SERVER_IP="${SERVER_IP:-127.0.0.1}:3003"
 
   echo "Detected server IP: $SERVER_IP"
@@ -77,7 +77,7 @@ else
   SERVER_IP=""
 fi
 
-# Default to 10.0.0.12:3003 if no IP found or use environment variable
+# Default to 10.0.0.6:3003 if no IP found or use environment variable
 SERVER_IP="${SERVER_IP:-127.0.0.1}:3003"
 
 # Create config directory
