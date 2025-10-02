@@ -1,5 +1,5 @@
 # casaverde_app/config.toml
-server = "https://10.0.0.12:3000"
+server = "https://10.0.0.12:3003"
 
 [[configs]]
 id = "blackbeard-cpu"

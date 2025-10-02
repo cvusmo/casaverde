@@ -18,7 +18,7 @@ use std::io;
 struct Args {
     #[arg(long, default_value_t = false)]
     tui: bool,
-    #[arg(long, default_value = "https://10.0.0.12:3000")]
+    #[arg(long, default_value = "https://10.0.0.12:3003")]
     server: String,
 }
 
@@ -28,7 +28,7 @@ fn main() -> io::Result<()> {
 
     let args = Args::parse();
     let server = std::env::var("SERVER_IP")
-        .map(|ip| format!("https://{ip}:3000"))
+        .map(|ip| format!("https://{ip}:3003"))
         .unwrap_or(args.server);
     if args.tui {
         run_tui(&server)

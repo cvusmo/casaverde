@@ -1,4 +1,4 @@
-// Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
+// Copyright 2025 Nicholas Jordan. All Rights Reserved.
 // github.com/cvusmo/casaverde/casaverde_server
 // src/main.rs
 
@@ -42,7 +42,7 @@ async fn main() -> io::Result<()> {
         .route("/temps", get(handlers::get_temperatures))
         .route("/sensor_data", get(handlers::get_all_data).post(handlers::post_sensor_data))
         .route("/commands", get(handlers::get_commands).post(handlers::post_commands))
-        .route("/configs/:controller_id", get(handlers::get_configs))
+        .route("/configs/{controller_id}", get(handlers::get_configs))
         .route("/configs", post(handlers::post_configs));
 
     axum_server::bind_rustls(addr, config)
@@ -53,8 +53,11 @@ async fn main() -> io::Result<()> {
 }
 
 fn get_server_addr() -> SocketAddr {
-    std::env::var("SERVER_IP")
-        .unwrap_or("10.0.0.12:3001".to_string())
-        .parse()
-        .expect("Invalid SERVER_IP format")
+    let ip = std::env::var("SERVER_IP")
+        .unwrap_or("10.0.0.12:3003".to_string());  // Default includes port
+    ip.parse()
+        .unwrap_or_else(|_| {
+            eprintln!("Invalid SERVER_IP format: {}. Using 10.0.0.12:3003", ip);
+            "10.0.0.12:3003".parse().expect("Default IP format invalid")
+        })
 }
