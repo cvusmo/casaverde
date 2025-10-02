@@ -11,17 +11,14 @@
             "id": "99e7f25afb18739f",
             "type": "leaf",
             "state": {
-              "type": "canvas",
+              "type": "markdown",
               "state": {
-                "file": "Casaverde Design Concepts/casaverde design map.canvas",
-                "viewState": {
-                  "x": -138,
-                  "y": 3718,
-                  "zoom": -3.8381248614595793
-                }
+                "file": "Casaverde Design Concepts/Casaverde Prototype.md",
+                "mode": "source",
+                "source": false
               },
-              "icon": "lucide-layout-dashboard",
-              "title": "casaverde design map"
+              "icon": "lucide-file",
+              "title": "Casaverde Prototype"
             }
           }
         ]
@@ -81,7 +78,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 300,
+    "collapsed": true
   },
   "right": {
     "id": "51c609673125af1e",
@@ -163,6 +161,7 @@
   },
   "left-ribbon": {
     "hiddenItems": {
+      "bases:Create new base": false,
       "switcher:Open quick switcher": false,
       "graph:Open graph view": false,
       "canvas:Create new canvas": false,
@@ -173,11 +172,12 @@
   },
   "active": "99e7f25afb18739f",
   "lastOpenFiles": [
-    "Casaverde Design Concepts/device a.md",
     "Casaverde Design Concepts/device b.md",
+    "Casaverde Design Concepts/Casaverde Prototype.md",
+    "Casaverde Design Concepts/device a.md",
+    "Casaverde Design Concepts/casaverde design map.canvas",
     "Pasted image 20250804065223.png",
     "Pasted image 20250804065247.png",
-    "Casaverde Design Concepts/casaverde design map.canvas",
     "Casaverde/casaverde.md",
     "Casaverde/casaverde_app/casaverde_app.md",
     "Casaverde/casaverde_controller/casaverde_controller.md",

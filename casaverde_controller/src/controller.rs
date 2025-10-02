@@ -17,12 +17,14 @@ pub struct CachedData {
     pub devices: Vec<DeviceReading>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Command {
     TurnOnCooling(String),  // Red LED turn on/off CPU cooling
-    TurnOffCooling(String), // Blue LED turn on/off GPU cooling
-    OpenValve(String),      // Yellow LED
-    CloseValve(String),     // Green LED reverse polarity
+    TurnOffCooling(String), // Green LED turn on/off GPU cooling
+    OpenValve(String),      // Blue LED
+    CloseValve(String),     // Yellow LED reverse polarity
+    TurnOnLight(String),    // Red
+    TurnOffLight(String),   // Orange
 }
 
 // Process local DS18B20 temperature readings

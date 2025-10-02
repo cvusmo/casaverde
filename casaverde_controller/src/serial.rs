@@ -1,6 +1,6 @@
 // Copyright 2025 Nicholas Jordan. All Rights Reserved.
 // github.com/cvusmo/casaverde/casaverde_controller
-// src/serial.rs -
+// src/serial.rs
 
 use crate::controller::Command;
 use log::info;
@@ -46,6 +46,16 @@ pub fn send_command(
         }
         Command::CloseValve(id) => {
             let command = format!("CLOSE_{id}\n");
+            port.write_all(command.as_bytes())?;
+            info!("Sent: {}", command.trim());
+        }
+        Command::TurnOnLight(id) => {
+            let command = format!("ON_{id}\n");
+            port.write_all(command.as_bytes())?;
+            info!("Sent: {}", command.trim());
+        }
+        Command::TurnOffLight(id) => {
+            let command = format!("OFF_{id}\n");
             port.write_all(command.as_bytes())?;
             info!("Sent: {}", command.trim());
         }

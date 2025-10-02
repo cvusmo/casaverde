@@ -72,6 +72,14 @@ pub async fn send_commands(client: &Client, server: &str, commands: &[Command]) 
                 action: "CloseValve".to_string(),
                 device_id: id.clone(),
             },
+            Command::TurnOnLight(id) => CommandData {
+                action: "TurnOnLight".to_string(),
+                device_id: id.clone(),
+            },
+            Command::TurnOffLight(id) => CommandData {
+                action: "TurnOffLight".to_string(),
+                device_id: id.clone(),
+            },
         }).collect(),
     };
 

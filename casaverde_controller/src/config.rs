@@ -11,6 +11,9 @@ pub struct Config {
     pub server: String,
     pub controller_id: String,
     pub serial_port: Option<String>,
+    pub light_relay_id: String,
+    pub light_on_hours: u64,
+    pub light_off_hours: u64,
 }
 
 pub fn load_config() -> Result<Config, Box<dyn std::error::Error>> {
