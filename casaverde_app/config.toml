@@ -1,7 +1,7 @@
 # Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 # config for casaverde_app
 
-server = "https://10.0.0.12:3003"
+server = "https://10.111.181.98:3003"
 
 [[configs]]
 id = "blackbeard-cpu"
@@ -14,16 +14,19 @@ serial_port = "/dev/ttyACM0"
 id = "blackbeard-gpu"
 type = "temperature"
 endpoint = "/sensor_data"
+serial_port = ""
 interval = 15
 
 [[configs]]
 id = "solar-1"
 type = "solar"
 endpoint = "/sensor_data"
+serial_port = ""
 interval = 15
 
 [[configs]]
 id = "relay-1"
 type = "relay"
 endpoint = "/relay_control"
+serial_port = ""
 interval = 15

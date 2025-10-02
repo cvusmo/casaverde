@@ -2,12 +2,12 @@
 // github.com/cvusmo/casaverde/casaverde_app
 // src/main.rs
 
-use casaverde_app::app::{run_app, CasaverdeApp};
+use casaverde_app::app::{CasaverdeApp, run_app};
 use casaverde_app::touch::run_touchscreen;
 use clap::Parser;
 use crossterm::{
-    terminal::{disable_raw_mode, enable_raw_mode, LeaveAlternateScreen},
     ExecutableCommand,
+    terminal::{LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use env_logger;
 use log::info;

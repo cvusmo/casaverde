@@ -1,10 +1,7 @@
 # casaverde_controller/config.toml
-server = "https://10.0.0.12:3003"
+server = "https://10.111.181.98:3003"
 controller_id = "blackbeard-pi"
-serial_port = "/dev/ttyACM0"
-
-[light_schedule]
-relay_id = "LIGHT1"
-on_hours = 16
-off_hours = 8
-
+serial_port = "/tmp/virtualcom0"  # Updated for simulation
+light_relay_id = "LIGHT1"
+light_on_hours = 16
+light_off_hours = 8

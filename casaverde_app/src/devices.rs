@@ -3,14 +3,15 @@
 // src/devices.rs
 
 use crate::models::{ConfigEntry, ConfigPayload};
+use log::{error, info, warn};
+use reqwest::{Certificate, Client};
 use serde::{Deserialize, Serialize};
-use reqwest::{Client, Certificate};
-use std::fs;
-use std::time::{Duration, Instant};
-use log::{info, warn, error};
+use serialport::{self, SerialPort};
 use std::error::Error;
+use std::fs;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 use uuid::Uuid;
-use std::process::Command as ProcessCommand;
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum Sensor {
@@ -39,6 +40,16 @@ impl Sensor {
             Sensor::Water => "Water Sensor",
         }
     }
+
+    pub fn device_id(self) -> &'static str {
+        match self {
+            Sensor::Solar => "solar-1",
+            Sensor::Temperature => "blackbeard-cpu",
+            Sensor::Moisture => "moisture-1",
+            Sensor::Humidity => "humidity-1",
+            Sensor::Water => "water-1",
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -59,7 +70,6 @@ pub struct DeviceConfigRoot {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct TempData {
     pub cpu: Option<f32>,
-    pub gpu: Option<f32>,
 }
 
 #[derive(Serialize)]
@@ -96,11 +106,18 @@ pub struct DeviceData {
     pub config: DeviceConfigRoot,
     pub client_id: String,
     pub active_count: usize,
+    pub serial_ports: Vec<Option<Arc<Mutex<Box<dyn SerialPort>>>>>,
 }
 
 impl DeviceData {
     pub fn new(config_path: &str) -> Self {
-        let config_str = match std::fs::read_to_string(config_path) {
+        let config_path = if config_path.is_empty() {
+            "/home/echo/tmp/config.toml".to_string()
+        } else {
+            config_path.to_string()
+        };
+        let cert_path = "/home/echo/tmp/server.crt";
+        let config_str = match std::fs::read_to_string(&config_path) {
             Ok(c) => c,
             Err(e) => {
                 error!("Failed to read config file {config_path}: {e}");
@@ -118,19 +135,19 @@ impl DeviceData {
         let device_count = config.configs.len().min(16);
         config.configs.truncate(device_count);
 
-        let cert = match fs::read("server.crt") {
+        let cert = match fs::read(&cert_path) {
             Ok(cert_data) => match Certificate::from_pem(&cert_data) {
                 Ok(c) => {
-                    info!("Certificate loaded successfully");
+                    info!("Certificate loaded successfully from {}", cert_path);
                     c
                 }
                 Err(e) => {
-                    error!("Invalid certificate: {e}");
+                    error!("Invalid certificate at {}: {}", cert_path, e);
                     panic!("Certificate validation failed");
                 }
             },
             Err(e) => {
-                error!("Failed to read server.crt: {e}");
+                error!("Failed to read server.crt at {}: {}", cert_path, e);
                 panic!("Certificate read failed");
             }
         };
@@ -139,72 +156,107 @@ impl DeviceData {
             .add_root_certificate(cert)
             .use_rustls_tls()
             .min_tls_version(reqwest::tls::Version::TLS_1_3)
-            .danger_accept_invalid_certs(true) // NOTE: TEMPORARY BYPASS
+            .danger_accept_invalid_certs(true)
             .build()
             .expect("Failed to build secure client");
 
-        let mut states = [false; Sensor::ALL.len()];
-        states[Sensor::Temperature as usize] = true;
+        let states = [true; Sensor::ALL.len()];
+        let serial_ports = config
+            .configs
+            .iter()
+            .map(|config| {
+                match serialport::new(&config.serial_port, 9600)
+                    .timeout(Duration::from_secs(1))
+                    .open()
+                {
+                    Ok(port) => {
+                        info!(
+                            "Opened serial port {} for device {}",
+                            config.serial_port, config.id
+                        );
+                        Some(Arc::new(Mutex::new(port)))
+                    }
+                    Err(e) => {
+                        error!(
+                            "Failed to open serial port {} for device {}: {}",
+                            config.serial_port, config.id, e
+                        );
+                        None
+                    }
+                }
+            })
+            .collect::<Vec<_>>();
+
         let device_values = vec![None; device_count];
 
         info!("DeviceData initialized with {device_count} devices");
         Self {
             states,
-            temp_data: TempData { cpu: None, gpu: None },
+            temp_data: TempData { cpu: None },
             device_values,
             last_updated: Instant::now(),
             client,
             config,
             client_id: Uuid::new_v4().to_string(),
             active_count: device_count,
+            serial_ports,
         }
     }
 
     pub async fn update_devices(&mut self) {
         let mut devices = Vec::new();
+        let configs = self.config.configs.clone();
 
-        if self.states[Sensor::Temperature as usize] {
-            self.temp_data = TempData {
-                cpu: get_cpu_temp(),
-                gpu: get_gpu_temp(),
+        for (i, config) in configs.iter().enumerate() {
+            let sensor = match config.id.as_str() {
+                "blackbeard-cpu" => Some(Sensor::Temperature),
+                "solar-1" => Some(Sensor::Solar),
+                "moisture-1" => Some(Sensor::Moisture),
+                "humidity-1" => Some(Sensor::Humidity),
+                "water-1" => Some(Sensor::Water),
+                _ => None,
             };
 
-            devices = vec![
-                DeviceReading { id: "blackbeard-cpu".to_string(), value: self.temp_data.cpu },
-                DeviceReading { id: "blackbeard-gpu".to_string(), value: self.temp_data.gpu },
-            ];
-
-            for (i, config) in self.config.configs.iter().enumerate() {
-                match config.id.as_str() {
-                    "blackbeard-cpu" => self.device_values[i] = self.temp_data.cpu,
-                    "blackbeard-gpu" => self.device_values[i] = self.temp_data.gpu,
-                    _ => {}
+            if let Some(sensor) = sensor {
+                if self.states[sensor as usize] {
+                    let value = self.read_from_serial(i, &config.id);
+                    self.device_values[i] = value;
+                    if config.id == "blackbeard-cpu" {
+                        self.temp_data.cpu = value;
+                    }
+                    devices.push(DeviceReading {
+                        id: config.id.clone(),
+                        value,
+                    });
+                } else {
+                    self.device_values[i] = None;
+                    if config.id == "blackbeard-cpu" {
+                        self.temp_data.cpu = None;
+                    }
                 }
-            }
-        } else {
-            self.temp_data = TempData { cpu: None, gpu: None };
-            for value in &mut self.device_values {
-                *value = None;
             }
         }
 
         if self.last_updated.elapsed() >= Duration::from_secs(5) {
             let reading = SensorReading {
                 client_id: self.client_id.clone(),
-                devices: devices,
+                devices,
             };
 
             let url = format!("{}/sensor_data", self.config.server);
-            info!("Sending JSON: {:?}", serde_json::to_string(&reading).unwrap_or_default());
+            info!(
+                "Sending JSON: {:?}",
+                serde_json::to_string(&reading).unwrap_or_default()
+            );
             match self.client.post(&url).json(&reading).send().await {
                 Ok(resp) => {
                     if resp.status().is_success() {
-                        info!("Successfully sent temperature data to server");
+                        info!("Successfully sent sensor data to server");
                         self.last_updated = Instant::now();
                     } else {
                         warn!("Failed to send data to {url}: status {}", resp.status());
                         if let Ok(text) = resp.text().await {
-                            warn!("Server response: {text}"); // Fixed with !
+                            warn!("Server response: {text}");
                         }
                     }
                 }
@@ -224,6 +276,61 @@ impl DeviceData {
         }
     }
 
+    fn read_from_serial(&mut self, index: usize, device_id: &str) -> Option<f32> {
+        if let Some(Some(port)) = self.serial_ports.get(index) {
+            let mut port = port.lock().unwrap();
+            let command = format!("{}\n", device_id);
+            if let Err(e) = port.write(command.as_bytes()) {
+                error!("Failed to write to serial port for {}: {}", device_id, e);
+                return None;
+            }
+
+            let mut buffer = [0u8; 128];
+            match port.read(&mut buffer) {
+                Ok(bytes_read) => {
+                    let response = String::from_utf8_lossy(&buffer[..bytes_read])
+                        .trim()
+                        .to_string();
+                    info!("Received from {}: {}", device_id, response);
+                    match response {
+                        s if s.starts_with("TEMP:") => s
+                            .strip_prefix("TEMP:")
+                            .and_then(|v| v.strip_suffix("°C"))
+                            .and_then(|v| v.parse::<f32>().ok()),
+                        s if s.starts_with("SOLAR:") => s
+                            .strip_prefix("SOLAR:")
+                            .and_then(|v| v.strip_suffix("W"))
+                            .and_then(|v| v.parse::<f32>().ok()),
+                        s if s.starts_with("MOISTURE:") => s
+                            .strip_prefix("MOISTURE:")
+                            .and_then(|v| v.parse::<f32>().ok()),
+                        s if s.starts_with("HUMIDITY:") => s
+                            .strip_prefix("HUMIDITY:")
+                            .and_then(|v| v.strip_suffix("%"))
+                            .and_then(|v| v.parse::<f32>().ok()),
+                        s if s.starts_with("WATER:") => {
+                            s.strip_prefix("WATER:").and_then(|v| v.parse::<f32>().ok())
+                        }
+                        _ => {
+                            error!("Invalid response for {}: {}", device_id, response);
+                            None
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to read from serial port for {}: {}", device_id, e);
+                    None
+                }
+            }
+        } else {
+            error!(
+                "No serial port available for device {} at index {}",
+                device_id, index
+            );
+            None
+        }
+    }
+
     pub fn toggle_sensor(&mut self, sensor: Sensor) {
         let index = sensor as usize;
         if index < self.states.len() {
@@ -240,48 +347,6 @@ impl DeviceData {
     pub async fn update_controller_config(&self, payload: ConfigPayload) {
         let url = format!("{}/configs", self.config.server);
         self.client.post(&url).json(&payload).send().await.ok();
-    }
-}
-
-fn get_cpu_temp() -> Option<f32> {
-    match ProcessCommand::new("sensors").output() {
-        Ok(output) => {
-            let sensors_str = String::from_utf8_lossy(&output.stdout);
-            for line in sensors_str.lines() {
-                if line.contains("Package id 0") {
-                    let parts: Vec<&str> = line.split_whitespace().collect();
-                    for part in parts {
-                        if part.ends_with("°C") {
-                            if let Ok(temp) = part.trim_end_matches("°C").trim_start_matches('+').parse::<f32>() {
-                                return Some(temp);
-                            }
-                        }
-                    }
-                }
-            }
-            None
-        }
-        Err(e) => {
-            error!("Failed to run sensors: {e}");
-            None
-        }
-    }
-}
-
-fn get_gpu_temp() -> Option<f32> {
-    match ProcessCommand::new("nvidia-smi")
-        .arg("--query-gpu=temperature.gpu")
-        .arg("--format=csv,noheader")
-        .output()
-    {
-        Ok(output) => {
-            let nvidia_str = String::from_utf8_lossy(&output.stdout);
-            nvidia_str.trim().parse().ok()
-        }
-        Err(e) => {
-            error!("Failed to run nvidia-smi: {e}");
-            None
-        }
     }
 }
 

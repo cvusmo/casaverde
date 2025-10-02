@@ -37,16 +37,35 @@ pub fn render_tui(
                         .id
                         .trim_matches(char::from(0));
                     let value = app.sensor_data.device_values[i];
+                    let sensor = match &id[..] {
+                        // Changed id.as_str() to &id[..]
+                        "blackbeard-cpu" => Some(Sensor::Temperature),
+                        "solar-1" => Some(Sensor::Solar),
+                        "moisture-1" => Some(Sensor::Moisture),
+                        "humidity-1" => Some(Sensor::Humidity),
+                        "water-1" => Some(Sensor::Water),
+                        _ => None,
+                    };
 
-                    let flag = if app.sensor_data.states[Sensor::Temperature as usize] {
+                    let flag = if sensor.map_or(false, |s| app.sensor_data.states[s as usize]) {
                         "[ON]  "
                     } else {
                         "[OFF] "
                     };
 
-                    let value_str = value.map_or("N/A".to_string(), |v| format!("{v:.1}°C"));
+                    let value_str = match (sensor, value) {
+                        (Some(Sensor::Temperature), Some(v)) => format!("{v:.1}°C"),
+                        (Some(Sensor::Solar), Some(v)) => format!("{v:.1}W"),
+                        (Some(Sensor::Moisture), Some(v)) => format!("{v:.1}%"),
+                        (Some(Sensor::Humidity), Some(v)) => format!("{v:.1}%"),
+                        (Some(Sensor::Water), Some(v)) => format!("{v:.1}%"),
+                        _ => "N/A".to_string(),
+                    };
+
                     items.push(ListItem::new(Span::raw(format!(
-                        "{flag} {id}: {value_str}"
+                        "{flag} {}: {}",
+                        sensor.map_or(id, |s| s.name()),
+                        value_str
                     ))));
                     info!("Rendering device {i}: id={id}, value={value:?}");
                 }
@@ -75,11 +94,30 @@ pub fn render_tui(
                         .id
                         .trim_matches(char::from(0));
                     let value = app.sensor_data.device_values[i];
+                    let sensor = match &id[..] {
+                        // Changed id.as_str() to &id[..]
+                        "blackbeard-cpu" => Some(Sensor::Temperature),
+                        "solar-1" => Some(Sensor::Solar),
+                        "moisture-1" => Some(Sensor::Moisture),
+                        "humidity-1" => Some(Sensor::Humidity),
+                        "water-1" => Some(Sensor::Water),
+                        _ => None,
+                    };
+
+                    let value_str = match (sensor, value) {
+                        (Some(Sensor::Temperature), Some(v)) => format!("{v:.1}°C"),
+                        (Some(Sensor::Solar), Some(v)) => format!("{v:.1}W"),
+                        (Some(Sensor::Moisture), Some(v)) => format!("{v:.1}%"),
+                        (Some(Sensor::Humidity), Some(v)) => format!("{v:.1}%"),
+                        (Some(Sensor::Water), Some(v)) => format!("{v:.1}%"),
+                        _ => "N/A".to_string(),
+                    };
+
                     temp_text.push(
                         Line::from(format!(
                             "{}: {}",
-                            id,
-                            value.map_or("N/A".to_string(), |v| format!("{v:.1}°C"))
+                            sensor.map_or(id, |s| s.name()),
+                            value_str
                         ))
                         .centered(),
                     );
@@ -106,7 +144,9 @@ pub fn render_tui(
         }
 
         let status_text = match app.screen {
-            Screen::Devices => "Navigate with Up/Down, Switch to Monitor with m, Quit with q",
+            Screen::Devices => {
+                "Navigate with Up/Down, Switch to Monitor with m, Toggle with t, Quit with q"
+            }
             Screen::Monitoring => "Switch to Devices with s, Quit with q",
         };
         let status = Paragraph::new(status_text)
