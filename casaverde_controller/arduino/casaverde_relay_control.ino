@@ -1,8 +1,8 @@
 // casaverde_relay_control
-const int relay1 = 2; // INT1 (Red LED, CPU)
-const int relay2 = 3; // INT2 (Blue LED, GPU)
-const int relay3 = 4; // VALVE1 (Yellow LED, OPEN)
-const int relay4 = 5; // VALVE2 (Green LED, CLOSE)
+const int relay1 = 2; // INT1 (Red LED, CPU cooling)
+const int relay2 = 3; // INT2 (Blue LED, GPU cooling)
+const int relay3 = 4; // LIGHT1 (Red LED, Light ON)
+const int relay4 = 5; // LIGHT2 (Green LED, Light OFF)
 
 void setup() {
   Serial.begin(9600);
@@ -22,40 +22,37 @@ void loop() {
     command.trim();
     if (command == "ON_INT1") {
       digitalWrite(relay1, HIGH);
-      Serial.println("Red LED turned on");
+      Serial.println("Red LED turned on (CPU cooling)");
     } else if (command == "OFF_INT1") {
       digitalWrite(relay1, LOW);
-      Serial.println("Red LED turned off");
+      Serial.println("Red LED turned off (CPU cooling)");
     } else if (command == "ON_INT2") {
       digitalWrite(relay2, HIGH);
-      Serial.println("Blue LED turned on");
+      Serial.println("Blue LED turned on (GPU cooling)");
     } else if (command == "OFF_INT2") {
       digitalWrite(relay2, LOW);
-      Serial.println("Blue LED turned off");
+      Serial.println("Blue LED turned off (GPU cooling)");
+    } else if (command == "ON_LIGHT1") {  // New command for light ON
+      digitalWrite(relay3, HIGH);
+      Serial.println("Light turned ON (Red LED)");
+    } else if (command == "OFF_LIGHT2") { // New command for light OFF
+      digitalWrite(relay4, HIGH);
+      Serial.println("Light turned OFF (Green LED)");
     } else if (command == "OPEN_VALVE1") {
-      digitalWrite(relay4, LOW);
-      digitalWrite(relay3, HIGH);
-      delay(3000);
-      digitalWrite(relay3, LOW);
-      Serial.println("Solenoid Open: Yellow LED");
+      // Valve control remains as is (though no relay assigned now)
+      Serial.println("Valve Open command received (no relay assigned)");
     } else if (command == "CLOSE_VALVE2") {
+      Serial.println("Valve Close command received (no relay assigned)");
+    } else if (command == "TEST_CYCLE") {
+      // Optional: Adjust test cycle for light simulation
+      digitalWrite(relay3, HIGH); // Light ON
+      Serial.println("Light ON: TEST TEST TEST");
+      delay(3000);
       digitalWrite(relay3, LOW);
-      digitalWrite(relay4, HIGH);
+      digitalWrite(relay4, HIGH); // Light OFF
+      Serial.println("Light OFF: TEST TEST TEST");
       delay(3000);
       digitalWrite(relay4, LOW);
-      Serial.println("Solenoid Closed: Green LED");
-    } else if (command == "TEST_CYCLE") {
-      digitalWrite(relay4, LOW);
-      digitalWrite(relay3, HIGH);
-      delay(3000); // OPEN VALVE
-      digitalWrite(relay3, LOW);
-      Serial.println("Solenoid OPEN: TEST TEST TEST");
-      delay(10000);
-      digitalWrite(relay3, LOW);
-      digitalWrite(relay4, HIGH);
-      delay(3000); // CLOSE VALVE
-      digitalWrite(relay4, LOW);
-      Serial.println("Solenoid CLOSED: TEST TEST TEST");
       Serial.println("TEST COMPLETE");
     } else {
       Serial.println("Unknown command: " + command);
