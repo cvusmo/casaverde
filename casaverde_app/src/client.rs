@@ -3,11 +3,11 @@
 // src/client.rs
 
 use std::error::Error;
-use crate::models::{ConfigEntry, ConfigPayload};
+use crate::models::{ConfigEntry};
 use log::{error, info, warn};
 use reqwest::Client;
 use serde::Serialize;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 #[derive(Clone)]
 pub struct AppClient {
@@ -69,10 +69,5 @@ impl AppClient {
     pub async fn fetch_controller_config(&self, controller_id: &str) -> Option<ConfigEntry> {
         let url = format!("{}/configs/{}", self.server, controller_id);
         self.client.get(&url).send().await.ok()?.json().await.ok()
-    }
-
-    pub async fn update_controller_config(&self, payload: ConfigPayload) {
-        let url = format!("{}/configs", self.server);
-        let _ = self.client.post(&url).json(&payload).send().await;
     }
 }

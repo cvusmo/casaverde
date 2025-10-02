@@ -8,8 +8,9 @@ use std::io;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Screen {
-    Devices,   
-    Monitoring, 
+    Devices,
+    Monitoring,
+    Config,
 }
 
 pub struct CasaverdeApp {
@@ -48,12 +49,23 @@ impl CasaverdeApp {
     pub fn switch_screen(&mut self) {
         self.screen = match self.screen {
             Screen::Devices => Screen::Monitoring,
-            Screen::Monitoring => Screen::Devices,
+            Screen::Monitoring => Screen::Config,
+            Screen::Config => Screen::Devices,
         };
     }
 
     pub fn toggle_selected_sensor(&mut self) {
-        self.sensor_data.toggle_sensor(Sensor::Temperature);
+        if self.screen == Screen::Devices {
+            let sensor = match self.sensor_data.config.configs[self.selected].id.as_str() {
+                "blackbeard-cpu" => Sensor::Temperature,
+                "solar-1" => Sensor::Solar,
+                "moisture-1" => Sensor::Moisture,
+                "humidity-1" => Sensor::Humidity,
+                "water-1" => Sensor::Water,
+                _ => return,
+            };
+            self.sensor_data.toggle_sensor(sensor);
+        }
     }
 }
 

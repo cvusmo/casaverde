@@ -2,10 +2,9 @@
 // github.com/cvusmo/casaverde/casaverde_app
 // src/devices.rs
 
-use crate::{client::AppClient, models::{ConfigEntry, ConfigPayload}};
+use crate::{client::AppClient, models::{ConfigEntry}};
 use log::{error, info};
 use serde::{Deserialize, Serialize};
-use std::fs;
 use uuid::Uuid;
 use tokio::time::Duration;
 
@@ -218,9 +217,5 @@ impl DeviceData {
 
     pub async fn fetch_controller_config(&self, controller_id: &str) -> Option<ConfigEntry> {
         self.client.fetch_controller_config(controller_id).await
-    }
-
-    pub async fn update_controller_config(&self, payload: ConfigPayload) {
-        self.client.update_controller_config(payload).await
     }
 }

@@ -19,3 +19,15 @@ pub struct ConfigData {
     pub light_on_hours: u64,
     pub light_off_hours: u64,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DeviceReading {
+    pub id: String,
+    pub value: Option<f32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SensorReading {
+    pub client_id: String,
+    pub devices: Vec<DeviceReading>,
+}

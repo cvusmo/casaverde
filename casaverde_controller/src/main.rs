@@ -2,6 +2,7 @@
 // github.com/cvusmo/casaverde/casaverde_controller
 // src/main.rs - Entry point for casaverde_controller
 
+use casaverde_controller::models;
 use log::{info, error};
 use std::fs::File;
 use std::sync::Arc;
@@ -13,7 +14,7 @@ use casaverde_controller::client;
 use casaverde_controller::config;
 use casaverde_controller::controller::{Command, process_remote_readings, process_local_rules, run_light_timer};
 use casaverde_controller::gpio;
-use casaverde_controller::serial::{init_serial, send_command};
+use casaverde_controller::serial::{init_serial, send_command, read_sensor_data};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -36,6 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let toml_str = toml::to_string(&config)?;
         std::fs::write("config.toml", toml_str)?;
         info!("Updated local config from server: {:?}", config);
+    } else {
         info!("Failed to fetch config from server; using local config.toml: {:?}", config);
     }
 
@@ -71,6 +73,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     loop {
+        let mut guard = port.lock().await;
+        let serial_ref: &mut dyn serialport::SerialPort = &mut **guard;
+        let sensor_data = read_sensor_data(serial_ref);
+        drop(guard); 
+
         let readings = match client::fetch_readings(&client, &config.server).await {
             Ok(r) => r,
             Err(e) => {
@@ -94,6 +101,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         for cmd in commands {
             if let Err(e) = cmd_tx.send(cmd).await {
                 error!("Failed to enqueue command: {}", e);
+            }
+        }
+
+        // Send sensor data to server
+        if let Some(data) = sensor_data {
+            let reading = crate::models::SensorReading {
+                client_id: config.controller_id.clone(),
+                devices: data,
+            };
+            if let Err(e) = client::send_commands(&client, &config.server, &[]).await {
+                error!("Failed to send sensor data: {}", e);
+            } else {
+                info!("Sent sensor data to server: {:?}", reading);
             }
         }
 

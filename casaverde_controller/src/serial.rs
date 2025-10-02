@@ -3,6 +3,7 @@
 // src/serial.rs
 
 use crate::controller::Command;
+use crate::models::DeviceReading;
 use log::info;
 use serialport;
 
@@ -86,4 +87,61 @@ pub fn send_command(
         }
     }
     Ok(())
+}
+
+pub fn read_sensor_data(port: &mut dyn serialport::SerialPort) -> Option<Vec<DeviceReading>> {
+    let mut buffer = [0u8; 128];
+    port.set_timeout(std::time::Duration::from_millis(500))
+        .ok()?;
+    match port.read(&mut buffer) {
+        Ok(n) if n > 0 => {
+            let response = String::from_utf8_lossy(&buffer[..n]).trim().to_string();
+            info!("Received from simulator: {}", response);
+            let mut readings = Vec::new();
+            if response.starts_with("TEMP:") {
+                if let Ok(value) = response[5..].parse::<f32>() {
+                    readings.push(DeviceReading {
+                        id: "blackbeard-cpu".to_string(),
+                        value: Some(value),
+                    });
+                }
+            } else if response.starts_with("SOLAR:") {
+                if let Ok(value) = response[6..].parse::<f32>() {
+                    readings.push(DeviceReading {
+                        id: "solar-1".to_string(),
+                        value: Some(value),
+                    });
+                }
+            } else if response.starts_with("MOISTURE:") {
+                if let Ok(value) = response[9..].parse::<f32>() {
+                    readings.push(DeviceReading {
+                        id: "moisture-1".to_string(),
+                        value: Some(value),
+                    });
+                }
+            } else if response.starts_with("HUMIDITY:") {
+                if let Ok(value) = response[9..].parse::<f32>() {
+                    readings.push(DeviceReading {
+                        id: "humidity-1".to_string(),
+                        value: Some(value),
+                    });
+                }
+            } else if response.starts_with("WATER:") {
+                if let Ok(value) = response[6..].parse::<f32>() {
+                    readings.push(DeviceReading {
+                        id: "water-1".to_string(),
+                        value: Some(value),
+                    });
+                }
+            } else if response.starts_with("RELAY:") {
+                let value = if response == "RELAY:OK" { 1.0 } else { 0.0 }; // Simplified
+                readings.push(DeviceReading {
+                    id: "relay-1".to_string(),
+                    value: Some(value),
+                });
+            }
+            Some(readings)
+        }
+        _ => None,
+    }
 }
