@@ -2,6 +2,9 @@
 server = "https://10.0.0.12:3003"
 controller_id = "blackbeard-pi"
 serial_port = "/dev/ttyACM0"
-light_relay_id = "LIGHT1"
-light_on_hours = 16
-light_off_hours = 8
+
+[light_schedule]
+relay_id = "LIGHT1"
+on_hours = 16
+off_hours = 8
+

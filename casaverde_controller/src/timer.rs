@@ -27,9 +27,9 @@ pub async fn run_light_timer(
         .expect("Time went backwards")
         .as_secs() / 3600 % 24;
     let initial_cmd = if hour < 18 {
-        Command::TurnOnLight(relay_id.clone())
+        Command::TurnOnSolar(relay_id.clone())
     } else {
-        Command::TurnOffLight(relay_id.clone())
+        Command::TurnOffSolar(relay_id.clone())
     };
     if let Err(e) = send_commands(&client, &server, &[initial_cmd.clone()]).await {
         error!("Failed to send initial light command to server: {}", e);
@@ -45,15 +45,15 @@ pub async fn run_light_timer(
 
     // Testing cycle: 15s ON, 15s OFF, repeat every 30s
     let mut interval = interval(Duration::from_secs(15));
-    let mut is_on = hour < 18; // Start with initial state
+    let mut is_on = hour < 18; 
 
     loop {
         interval.tick().await;
         is_on = !is_on;
         let cmd = if is_on {
-            Command::TurnOnLight(relay_id.clone())
+            Command::TurnOnSolar(relay_id.clone())
         } else {
-            Command::TurnOffLight(relay_id.clone())
+            Command::TurnOffSolar(relay_id.clone())
         };
         if let Err(e) = send_commands(&client, &server, &[cmd.clone()]).await {
             error!("Failed to send light {} to server: {}", if is_on { "ON" } else { "OFF" }, e);

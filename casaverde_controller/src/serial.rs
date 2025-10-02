@@ -17,10 +17,10 @@ pub fn init_serial(
         .timeout(std::time::Duration::from_millis(1000))
         .open()
         .map_err(|e| {
-            log::error!("Failed to open serial port {}: {}", port_name, e);
+            log::error!("Failed to open serial port {port_name}: {e}");
             e
         })?;
-    info!("Serial port {} initialized at 9600 baud", port_name);
+    info!("Serial port {port_name} initialized at 9600 baud");
     Ok(port)
 }
 
@@ -30,40 +30,60 @@ pub fn send_command(
 ) -> Result<(), Box<dyn std::error::Error>> {
     match cmd {
         Command::TurnOnCooling(id) => {
-            let command = format!("ON_{}\n", id);
+            let command = format!("ON_{id}\n");
             port.write_all(command.as_bytes())?;
-            info!(
-                "Sent command to turn ON relay {} (e.g., INT1 for CPU cooling)",
-                id
-            );
+            info!("Sent command to turn ON relay {id}");
         }
         Command::TurnOffCooling(id) => {
-            let command = format!("OFF_{}\n", id);
+            let command = format!("OFF_{id}\n");
             port.write_all(command.as_bytes())?;
-            info!(
-                "Sent command to turn OFF relay {} (e.g., INT2 for GPU cooling)",
-                id
-            );
+            info!("Sent command to turn OFF relay {id}");
         }
-        Command::OpenValve(id) => {
-            let command = format!("OPEN_{}\n", id);
+        Command::TurnOnMoisture(id) => {
+            let command = format!("ON_{id}\n");
             port.write_all(command.as_bytes())?;
-            info!("Sent command to open valve on relay {}", id);
+            info!("Sent command TurnOnMoisture to turn OFF relay {id}");
+        }
+        Command::TurnOffMoisture(id) => {
+            let command = format!("OFF_{id}\n");
+            port.write_all(command.as_bytes())?;
+            info!("Sent command TurnOffMoisture to turn OFF relay {id}");
+        }
+
+        Command::OpenValve(id) => {
+            let command = format!("OPEN_{id}\n");
+            port.write_all(command.as_bytes())?;
+            info!("Sent command OpenValve to turn OFF relay {id}");
         }
         Command::CloseValve(id) => {
-            let command = format!("CLOSE_{}\n", id);
+            let command = format!("CLOSE_{id}\n");
             port.write_all(command.as_bytes())?;
-            info!("Sent command to close valve on relay {}", id);
+            info!("Sent command CloseValve on relay {id}");
         }
-        Command::TurnOnLight(id) => {
-            let command = format!("ON_{}\n", id);
+        Command::TurnOnSolar(id) => {
+            let command = format!("ON_{id}\n");
             port.write_all(command.as_bytes())?;
-            info!("Sent command to turn ON light relay {} (e.g., INT3)", id);
+            info!("Sent command TurnOnSolar on relay {id}");
         }
-        Command::TurnOffLight(id) => {
-            let command = format!("OFF_{}\n", id);
+        Command::TurnOffSolar(id) => {
+            let command = format!("OFF_{id}\n");
             port.write_all(command.as_bytes())?;
-            info!("Sent command to turn OFF light relay {} (e.g., INT4)", id);
+            info!("Sent command TurnOffSolar on relay {id}");
+        }
+        Command::TurnOnHumidity(id) => {
+            let command = format!("OFF_{id}\n");
+            port.write_all(command.as_bytes())?;
+            info!("Sent command TurnOnHumidity on relay {id}");
+        }
+        Command::TurnOffHumidity(id) => {
+            let command = format!("OFF_{id}\n");
+            port.write_all(command.as_bytes())?;
+            info!("Sent command TurnOffHumidity relay {id}");
+        }
+        Command::SetPWM(id, pwm) => {
+            let command = format!("PWM_{id}_{pwm}\n");
+            port.write_all(command.as_bytes())?;
+            info!("Sent command SetPWM {pwm} on relay {id}");
         }
     }
     Ok(())

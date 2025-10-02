@@ -47,6 +47,7 @@ pub struct DeviceConfig {
     pub r#type: String,
     pub endpoint: String,
     pub interval: u32,
+    pub serial_port: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

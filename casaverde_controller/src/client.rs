@@ -4,11 +4,12 @@
 
 use crate::config;
 use crate::config::Config;
-use crate::controller::{Command, CachedData};
+use crate::controller::Command;
 use crate::models::ConfigEntry;
 use log::{error, info};
 use reqwest::{Client, Certificate};
 use serde::Serialize;
+use serde_json::Value;
 use std::fs;
 
 #[derive(Serialize, Debug)]
@@ -46,9 +47,9 @@ pub fn build_secure_client() -> Result<Client, Box<dyn std::error::Error>> {
         })?)
 }
 
-pub async fn fetch_readings(client: &Client, server: &str) -> Result<Vec<CachedData>, Box<dyn std::error::Error>> {
+pub async fn fetch_readings(client: &Client, server: &str) -> Result<Value, Box<dyn std::error::Error>> {
     let url = format!("{server}/temps");
-    let resp = client.get(&url).send().await?.json::<Vec<CachedData>>().await?;
+    let resp = client.get(&url).send().await?.json::<Value>().await?;
     info!("Fetched readings from {url}");
     Ok(resp)
 }
@@ -79,6 +80,14 @@ pub async fn send_commands(client: &Client, server: &str, commands: &[Command]) 
                 action: "TurnOffCooling".to_string(),
                 device_id: id.clone(),
             },
+            Command::TurnOnMoisture(id) => CommandData {
+                action: "TurnOnMoisture".to_string(),
+                device_id: id.clone(),
+            },
+            Command::TurnOffMoisture(id) => CommandData {
+                action: "TurnOffMoisture".to_string(),
+                device_id: id.clone(),
+            },
             Command::OpenValve(id) => CommandData {
                 action: "OpenValve".to_string(),
                 device_id: id.clone(),
@@ -87,13 +96,25 @@ pub async fn send_commands(client: &Client, server: &str, commands: &[Command]) 
                 action: "CloseValve".to_string(),
                 device_id: id.clone(),
             },
-            Command::TurnOnLight(id) => CommandData {
+            Command::TurnOnSolar(id) => CommandData {
                 action: "TurnOnLight".to_string(),
                 device_id: id.clone(),
             },
-            Command::TurnOffLight(id) => CommandData {
+            Command::TurnOffSolar(id) => CommandData {
                 action: "TurnOffLight".to_string(),
                 device_id: id.clone(),
+            },
+            Command::TurnOnHumidity(id) => CommandData {
+                action: "TurnOnHumidity".to_string(),
+                device_id: id.clone(),
+            },
+            Command::TurnOffHumidity(id) => CommandData {
+                action: "TurnOffHumidity".to_string(),
+                device_id: id.clone(),
+            },
+            Command::SetPWM(id, pwm) => CommandData {
+                action: "SetPWM".to_string(),
+                device_id: format!("{}_{}", id, pwm),
             },
         }).collect(),
     };
