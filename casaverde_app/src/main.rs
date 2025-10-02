@@ -2,12 +2,12 @@
 // github.com/cvusmo/casaverde/casaverde_app
 // src/main.rs
 
-use casaverde_app::app::{CasaverdeApp, run_app};
+use casaverde_app::app::{run_app, CasaverdeApp};
 use casaverde_app::touch::run_touchscreen;
 use clap::Parser;
 use crossterm::{
+    terminal::{disable_raw_mode, enable_raw_mode, LeaveAlternateScreen},
     ExecutableCommand,
-    terminal::{LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use env_logger;
 use log::info;
@@ -18,7 +18,7 @@ use std::io;
 struct Args {
     #[arg(long, default_value_t = false)]
     tui: bool,
-    #[arg(long, default_value = "https://10.0.0.12:3003")]
+    #[arg(long, default_value = "https://10.0.0.6:3003")]
     server: String,
     #[arg(long, default_value_t = false)]
     local_server: bool,

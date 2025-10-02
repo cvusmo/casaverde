@@ -1,6 +1,6 @@
 // Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 // github.com/cvusmo/casaverde/casaverde_controller
-// src/controller.rs - Data processing and command generation
+// src/controller.rs
 
 use log::info;
 use tokio::sync::mpsc::Sender;
@@ -18,25 +18,39 @@ pub struct SensorState {
 
 #[derive(Debug, Clone)]
 pub enum Command {
-    TurnOnCooling(String),      // Temperature
-    TurnOffCooling(String),     // Temperature
-    TurnOnMoisture(String),     // Moisture
-    TurnOffMoisture(String),    // Moisture 
-    OpenValve(String),          // Water
-    CloseValve(String),         // Water 
-    TurnOnSolar(String),        // Solar 
-    TurnOffSolar(String),       // Solar 
-    TurnOnHumidity(String),     // Humidity 
-    TurnOffHumidity(String),    // Humidity 
+    TurnOnCooling(String),
+    TurnOffCooling(String),
+    TurnOnMoisture(String),
+    TurnOffMoisture(String),
+    OpenValve(String),
+    CloseValve(String),
+    TurnOnSolar(String),
+    TurnOffSolar(String),
+    TurnOnHumidity(String),
+    TurnOffHumidity(String),
     SetPWM(String, u8),
 }
 
 pub fn process_remote_readings(readings: &Value, controller_id: &str) -> Vec<Command> {
     let mut cmds = Vec::new();
-    if let Some(temp) = readings.get(controller_id).and_then(|v| v.get("temperature")) {
-        if let Some(t) = temp.as_f64() {
-            if t > 40.0 {
-                cmds.push(Command::TurnOnCooling("FAN1".to_string()));
+    if let Some(client_readings) = readings.as_array() {
+        for client_reading in client_readings.iter() {
+            if let Some(arr) = client_reading.as_array() {
+                if let (Some(id), Some(devices)) = (arr.get(0).and_then(|id| id.as_str()), arr.get(1)) {
+                    if id == controller_id {
+                        if let Some(devices_array) = devices.as_array() {
+                            for device in devices_array {
+                                if let Some(obj) = device.as_object() {
+                                    let id = obj.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                                    let value = obj.get("value").and_then(|v| v.as_f64());
+                                    if id == "blackbeard-cpu" && value.unwrap_or(0.0) > 40.0 {
+                                        cmds.push(Command::TurnOnCooling("FAN1".to_string()));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
