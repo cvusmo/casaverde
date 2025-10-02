@@ -2,6 +2,8 @@
 // github.com/cvusmo/casaverde/casaverde_controller
 // src/client.rs - HTTP client setup and data fetching
 
+// TODO: RENAME TO COMMANDS.RS
+
 use crate::config;
 use crate::config::Config;
 use crate::controller::Command;
@@ -129,4 +131,14 @@ pub async fn send_commands(client: &Client, server: &str, commands: &[Command]) 
         error!("Failed to send commands to {url}: status {status}, response {text}");
         Err(format!("Failed to send commands: status {status}").into())
     }
+}
+
+pub async fn send_sensor_data(
+    client: &reqwest::Client,
+    server: &str,
+    reading: &crate::models::SensorReading,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let url = format!("{}/sensor_data", server);
+    client.post(&url).json(reading).send().await?.error_for_status()?;
+    Ok(())
 }

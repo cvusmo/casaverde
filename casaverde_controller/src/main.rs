@@ -72,51 +72,54 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
-    loop {
-        let mut guard = port.lock().await;
-        let serial_ref: &mut dyn serialport::SerialPort = &mut **guard;
-        let sensor_data = read_sensor_data(serial_ref);
-        drop(guard); 
+loop {
+    let mut guard = port.lock().await;
+    let serial_ref: &mut dyn serialport::SerialPort = &mut **guard;
+    let sensor_data = read_sensor_data(serial_ref);
+    drop(guard); 
 
-        let readings = match client::fetch_readings(&client, &config.server).await {
-            Ok(r) => r,
-            Err(e) => {
-                error!("fetch_readings error: {}", e);
-                sleep(Duration::from_secs(5)).await;
-                continue;
-            }
-        };
-        info!("Fetched readings from server: {:?}", readings);
-
-        let local_temp = gpio::read_temperature();
-        info!("Local temperature reading: {:?}", local_temp);
-
-        let remote_commands = process_remote_readings(&readings, &config.controller_id);
-        let local_commands = process_local_rules(&config, local_temp.unwrap_or_default().into());
-
-        let mut commands = Vec::new();
-        commands.extend(remote_commands);
-        commands.extend(local_commands);
-
-        for cmd in commands {
-            if let Err(e) = cmd_tx.send(cmd).await {
-                error!("Failed to enqueue command: {}", e);
-            }
+    let readings = match client::fetch_readings(&client, &config.server).await {
+        Ok(r) => r,
+        Err(e) => {
+            error!("fetch_readings error: {}", e);
+            sleep(Duration::from_secs(5)).await;
+            continue;
         }
+    };
+    info!("Fetched readings from server: {:?}", readings);
 
-        // Send sensor data to server
-        if let Some(data) = sensor_data {
-            let reading = crate::models::SensorReading {
-                client_id: config.controller_id.clone(),
-                devices: data,
-            };
-            if let Err(e) = client::send_commands(&client, &config.server, &[]).await {
-                error!("Failed to send sensor data: {}", e);
-            } else {
-                info!("Sent sensor data to server: {:?}", reading);
-            }
+    let local_temp = gpio::read_temperature();
+    info!("Local temperature reading: {:?}", local_temp);
+
+    let remote_commands = process_remote_readings(&readings, &config.controller_id);
+    let local_commands = process_local_rules(&config, local_temp.unwrap_or_default().into());
+
+    let mut commands = Vec::new();
+    commands.extend(remote_commands);
+    commands.extend(local_commands);
+
+    for cmd in commands {
+        if let Err(e) = cmd_tx.send(cmd).await {
+            error!("Failed to enqueue command: {}", e);
         }
+    }
 
-        sleep(Duration::from_secs(5)).await;
+    // Always create and send sensor reading, including local CPU temp
+    let mut devices = sensor_data.unwrap_or_default();
+    devices.push(models::DeviceReading {
+        id: "blackbeard-cpu".to_string(),
+        value: local_temp,
+    });
+    let reading = models::SensorReading {
+        client_id: config.controller_id.clone(),
+        devices,
+    };
+    if let Err(e) = client::send_sensor_data(&client, &config.server, &reading).await {
+        error!("Failed to send sensor data: {}", e);
+    } else {
+        info!("Sent sensor data to server: {:?}", reading);
+    }
+
+    sleep(Duration::from_secs(5)).await;
     }
 }

@@ -2,60 +2,46 @@
 // github.com/cvusmo/casaverde/casaverde_controller
 // src/gpio.rs
 
-use std::fs::File;
+use std::fs::{read_dir, File};
 use std::io::Read;
-//use std::io::Write;
-//use std::thread;
-//use std::time::Duration;
-
-pub fn initialize_gpio() {
-    //let mut gpio_export = File::create("/sys/class/gpio/export").unwrap();
-    //gpio_export.write_all(b"17\n").unwrap(); // DS pin
-    //gpio_export.write_all(b"27\n").unwrap(); // SHCP pin
-    //gpio_export.write_all(b"22\n").unwrap(); // STCP pin
-    //thread::sleep(Duration::from_millis(100)); // Wait for export
-
-    //let gpio_direction = |pin: &str| {
-    //let mut file = File::create(&format!("/sys/class/gpio/gpio{}/direction", pin)).unwrap();
-    //file.write_all(b"out").unwrap();
-    //};
-    //gpio_direction("17");
-    //gpio_direction("27");
-    //gpio_direction("22");
-}
-
-//pub fn shift_out(data: u8) {
-//let gpio_write = |pin: &str, value: u8| {
-//let mut file = File::create(&format!("/sys/class/gpio/gpio{}/value", pin)).unwrap();
-//file.write_all(&[value]).unwrap();
-//};
-
-//gpio_write("22", 0); // ST_CP low
-//for i in (0..8).rev() {
-//let bit = (data >> i) & 1;
-//gpio_write("17", bit); // DS
-//gpio_write("27", 1); // SH_CP high
-//std::thread::sleep(Duration::from_micros(1));
-//gpio_write("27", 0); // SH_CP low
-//}
-//gpio_write("22", 1); // ST_CP high
-//std::thread::sleep(Duration::from_micros(1));
-//gpio_write("22", 0); // ST_CP low
-//}
+use std::path::Path;
 
 pub fn read_temperature() -> Option<f32> {
-    let devices = std::fs::read_dir("/sys/bus/w1/devices").ok()?;
-    for device in devices {
-        let device = device.ok()?;
-        let path = device.path();
-        if path.ends_with("w1_slave") {
-            let mut file = File::open(&path).ok()?;
-            let mut contents = String::new();
-            file.read_to_string(&mut contents).ok()?;
-            let lines: Vec<&str> = contents.split('\n').collect();
-            if lines.len() > 1 {
-                let temp_data = lines[1].split('=').nth(1)?;
-                return Some(temp_data.parse::<f32>().unwrap_or(0.0) / 1000.0); // Convert to °C
+    let thermal_dir = Path::new("/sys/class/hwmon/");
+    if let Ok(entries) = read_dir(thermal_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                let name_path = path.join("name");
+                let mut name = String::new();
+                if let Ok(mut file) = File::open(&name_path) {
+                    if file.read_to_string(&mut name).is_ok() && name.trim() == "coretemp" {
+                        let mut i = 1;
+                        loop {
+                            let label_path = path.join(format!("temp{}_label", i));
+                            if !label_path.exists() {
+                                break;
+                            }
+                            let mut label = String::new();
+                            if let Ok(mut file) = File::open(&label_path) {
+                                if file.read_to_string(&mut label).is_ok()
+                                    && label.trim() == "Package id 0"
+                                {
+                                    let temp_path = path.join(format!("temp{}_input", i));
+                                    let mut temp_str = String::new();
+                                    if let Ok(mut file) = File::open(&temp_path) {
+                                        if file.read_to_string(&mut temp_str).is_ok() {
+                                            if let Ok(temp_milli) = temp_str.trim().parse::<f32>() {
+                                                return Some(temp_milli / 1000.0);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            i += 1;
+                        }
+                    }
+                }
             }
         }
     }

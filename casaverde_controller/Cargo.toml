@@ -1,15 +1,17 @@
 # casaverde_controller/Cargo.toml
 [package]
 name = "casaverde_controller"
-version = "0.1.1"
-edition = "2024"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
 
 [dependencies]
-env_logger = "0.11.8"
-log = "0.4.27"
-reqwest = { version = "0.12.22", features = ["json", "rustls-tls"] }
-serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.145"
-serialport = "4.7.2"
-tokio = { version = "1.47.1", features = ["full"] }
-toml = "0.9.5"
+env_logger.workspace = true
+log.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serialport.workspace = true
+tokio.workspace = true
+toml.workspace = true
+casaverde_utils = { path = "../casaverde_utils" }
