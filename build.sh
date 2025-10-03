@@ -7,9 +7,9 @@ set -euo pipefail
 # --- Configuration ---
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON_SCRIPT="${PROJECT_ROOT}/casaverde_automate.py"
-TESTING_ROOT="${HOME}/casaverde_test"
+TESTING_ROOT="${PROJECT_ROOT}/casaverde_test"
 VENV_PYTHON="${PROJECT_ROOT}/casaverde_sim/venv/bin/python"
-SIM_SCRIPT="${PROJECT_ROOT}/casaverde_sim/casaverde_sim_1.py"
+SIM_SCRIPT="${PROJECT_ROOT}/casaverde_sim/casaverde_sim.py"
 CONFIG_DIR="${HOME}/.config/casaverde_server"
 BUILD_LOG="${PROJECT_ROOT}/build.log"
 
@@ -42,12 +42,10 @@ INSTALL_DIR="/usr/local/bin"
 [[ "$OS" == "macos" ]] && INSTALL_DIR="/usr/local/bin"
 
 # --- Timing Helper ---
-# Get current time in seconds with nanosecond precision
 get_time_s() {
     date +%s.%N
 }
 
-# Log message with timestamp
 log_with_timestamp() {
     local msg="$1"
     echo "[$(date '+%Y-%m-%d %H:%M:%S.%3N')] $msg" | tee -a "$BUILD_LOG"
@@ -64,7 +62,6 @@ build_project() {
     fi
     pushd "$PROJECT_ROOT/$project" >/dev/null || { log_with_timestamp "❌ Failed to enter $project directory"; exit 1; }
     
-    # Debug: Log current directory and Cargo.toml presence
     log_with_timestamp "DEBUG: Current directory: $(pwd)"
     [[ -f "Cargo.toml" ]] && log_with_timestamp "DEBUG: Cargo.toml found" || log_with_timestamp "DEBUG: Cargo.toml not found"
 
@@ -75,7 +72,6 @@ build_project() {
     fi
     popd >/dev/null || exit 1
 
-    # Debug: Check if target/release/ exists
     local release_dir="$PROJECT_ROOT/$project/target/release"
     if [[ "$USE_TARGET_FLAG" == true ]]; then
         release_dir="$PROJECT_ROOT/$project/target/$RUST_TARGET/release"
@@ -95,14 +91,13 @@ build_project() {
 install_binary() {
     local project="$1"
     local start_time=$(get_time_s)
-    local bin_name="casaverde_${project##casaverde_}" # Matches Cargo.toml [[bin]] name
+    local bin_name="casaverde_${project##casaverde_}"
     local bin_path
     if [[ "$USE_TARGET_FLAG" == true ]]; then
         bin_path="$PROJECT_ROOT/$project/target/$RUST_TARGET/release/$bin_name"
     else
         bin_path="$PROJECT_ROOT/$project/target/release/$bin_name"
     fi
-    # Fallback to workspace root
     local workspace_bin_path="$PROJECT_ROOT/target/release/$bin_name"
     log_with_timestamp "📦 Installing $project binary to $INSTALL_DIR"
     log_with_timestamp "DEBUG: Checking for binary at $bin_path"
@@ -137,6 +132,20 @@ setup_project_env() {
     local config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/$project"
     local cert_dir="$HOME/.casaverde_cert"
     mkdir -p "$config_dir" "$cert_dir" || { log_with_timestamp "❌ Failed to create directories for $project"; exit 1; }
+    # Copy config.toml to ~/.config/$project/ for casaverde_app and casaverde_controller
+    if [[ "$project" != "casaverde_server" ]]; then
+        local config_path="$PROJECT_ROOT/$project/config.toml"
+        local dest_config="$config_dir/config.toml"
+        if [[ -f "$config_path" ]]; then
+            cp "$config_path" "$dest_config" || {
+                log_with_timestamp "❌ Failed to copy config.toml to $dest_config"
+                exit 1
+            }
+            log_with_timestamp "✅ Copied config.toml to $dest_config"
+        else
+            log_with_timestamp "⚠️ No config.toml found for $project at $config_path"
+        fi
+    fi
     local end_time=$(get_time_s)
     local duration=$(echo "$end_time - $start_time" | bc)
     log_with_timestamp "✅ Environment setup complete for $project (Duration: $(printf "%.2f" $duration)s)"
@@ -146,6 +155,10 @@ ensure_config() {
     local project="$1"
     local default="$2"
     local start_time=$(get_time_s)
+    if [[ "$project" == "casaverde_server" ]]; then
+        log_with_timestamp "ℹ️ Skipping config check for $project (no config.toml required)"
+        return
+    fi
     local config_path="${XDG_CONFIG_HOME:-$HOME/.config}/$project/$default"
     if [[ ! -f "$config_path" ]]; then
         if [[ -f "$PROJECT_ROOT/$project/$default" ]]; then
@@ -182,6 +195,69 @@ ensure_certificates() {
     local end_time=$(get_time_s)
     local duration=$(echo "$end_time - $start_time" | bc)
     log_with_timestamp "✅ Certificate check complete for $project (Duration: $(printf "%.2f" $duration)s)"
+}
+
+copy_to_testing_root() {
+    local start_time=$(get_time_s)
+    log_with_timestamp "📂 Copying files to testing root: $TESTING_ROOT..."
+
+    # Create testing root and subdirectories
+    mkdir -p "$TESTING_ROOT/casaverde_app" "$TESTING_ROOT/casaverde_controller" "$TESTING_ROOT/casaverde_server" || {
+        log_with_timestamp "❌ Failed to create testing directories"
+        exit 1
+    }
+
+    # Copy binaries from workspace root
+    for project in "casaverde_app" "casaverde_controller" "casaverde_server"; do
+        local bin_name="casaverde_${project##casaverde_}"
+        local bin_path="$PROJECT_ROOT/target/release/$bin_name"
+        local dest_dir="$TESTING_ROOT/$project"
+        if [[ -f "$bin_path" ]]; then
+            cp "$bin_path" "$dest_dir/$bin_name" || {
+                log_with_timestamp "❌ Failed to copy $bin_name to $dest_dir"
+                exit 1
+            }
+            log_with_timestamp "✅ Copied $bin_name to $dest_dir"
+        else
+            log_with_timestamp "❌ Binary $bin_name not found at $bin_path"
+            exit 1
+        fi
+    done
+
+    # Copy config.toml for casaverde_app and casaverde_controller
+    for project in "casaverde_app" "casaverde_controller"; do
+        local config_path="$PROJECT_ROOT/$project/config.toml"
+        local dest_config="$TESTING_ROOT/$project/config.toml"
+        if [[ -f "$config_path" ]]; then
+            cp "$config_path" "$dest_config" || {
+                log_with_timestamp "❌ Failed to copy config.toml to $dest_config"
+                exit 1
+            }
+            log_with_timestamp "✅ Copied config.toml to $dest_config"
+        else
+            log_with_timestamp "⚠️ No config.toml found for $project at $config_path"
+        fi
+    done
+
+    # Copy server.crt for casaverde_app and casaverde_controller
+    local cert_path="$CONFIG_DIR/server.crt"
+    for project in "casaverde_app" "casaverde_controller"; do
+        local dest_cert="$TESTING_ROOT/$project/server.crt"
+        if [[ -f "$cert_path" ]]; then
+            cp "$cert_path" "$dest_cert" || {
+                log_with_timestamp "❌ Failed to copy server.crt to $dest_cert"
+                exit 1
+            }
+            log_with_timestamp "✅ Copied server.crt to $dest_cert"
+        else
+            log_with_timestamp "❌ server.crt not found at $cert_path"
+            exit 1
+        fi
+    done
+
+    local end_time=$(get_time_s)
+    local duration=$(echo "$end_time - $start_time" | bc)
+    log_with_timestamp "✅ Files copied to testing root (Duration: $(printf "%.2f" $duration)s)"
 }
 
 open_port_3003() {
@@ -227,13 +303,14 @@ main() {
             for project in "casaverde_utils" "casaverde_server" "casaverde_app" "casaverde_controller"; do
                 build_project "$project"
             done
-            # Install binaries for executable projects only
+            # Install binaries and setup environment
             for project in "casaverde_server" "casaverde_app" "casaverde_controller"; do
                 install_binary "$project"
                 setup_project_env "$project"
                 ensure_config "$project" "config.toml"
             done
             ensure_certificates "casaverde_server"
+            copy_to_testing_root
             open_port_3003
             local end_time=$(get_time_s)
             local duration=$(echo "$end_time - $start_time" | bc)

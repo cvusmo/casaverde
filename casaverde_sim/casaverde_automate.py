@@ -1,6 +1,3 @@
-# python casaverde_automate.py --testing-root ~/casaverde_test
-# python /home/echo/projects/remote/casaverde/casaverde_sim/casaverde_automate.py --testing-root ~/casaverde_test
-
 import argparse
 import logging
 import os
@@ -49,21 +46,40 @@ def main(args):
         "PROJECT_ROOT", os.path.join(home, "projects", "remote", "casaverde")
     )
     testing_root = args.testing_root or os.getenv(
-        "TESTING_ROOT", os.path.join(home, "casaverde_test")
+        "TESTING_ROOT", os.path.join(project_root, "casaverde_test")
     )
     venv_python = args.venv_python or os.getenv(
         "VENV_PYTHON",
         os.path.join(project_root, "casaverde_sim", "venv", "bin", "python"),
     )
     sim_script = args.sim_script or os.getenv(
-        "SIM_SCRIPT", os.path.join(project_root, "casaverde_sim", "casaverde_sim_1.py")
+        "SIM_SCRIPT", os.path.join(project_root, "casaverde_sim", "casaverde_sim.py")
     )
     config_dir = args.config_dir or os.getenv(
         "CONFIG_DIR", os.path.join(home, ".config", "casaverde_server")
     )
 
+    # Print server address
+    server_address = "https://10.0.0.6:3003"
+    print(f"Server address: {server_address}")
+
+    # Check and create testing_root
+    try:
+        if not os.path.isdir(testing_root):
+            print(f"Creating testing root directory: {testing_root}")
+            os.makedirs(testing_root)
+    except OSError as e:
+        print(f"Error: Failed to create testing root {testing_root}: {e}")
+        sys.exit(1)
+
     # Setup logging
-    logger = setup_logging(testing_root, getattr(logging, args.log_level.upper()))
+    try:
+        logger = setup_logging(testing_root, getattr(logging, args.log_level.upper()))
+    except OSError as e:
+        print(
+            f"Error: Failed to setup logging at {testing_root}/casaverde_automate.log: {e}"
+        )
+        sys.exit(1)
 
     # Validate key paths
     try:
@@ -75,22 +91,22 @@ def main(args):
         print(f"Error: {e}")
         sys.exit(1)
 
-    # Clean testing root if requested
-    if args.clean:
+    # Clean testing root if requested or by default
+    if args.clean or not args.no_clean:
         if os.path.exists(testing_root):
             shutil.rmtree(testing_root)
+            os.makedirs(testing_root)
         logger.info("Cleaned testing root.")
         print("Cleaned testing root.")
 
     # Create testing directories
-    os.makedirs(testing_root, exist_ok=True)
     app_dir = os.path.join(testing_root, "casaverde_app")
     controller_dir = os.path.join(testing_root, "casaverde_controller")
     server_dir = os.path.join(testing_root, "casaverde_server")
     for dir_path in [app_dir, controller_dir, server_dir]:
         os.makedirs(dir_path, exist_ok=True)
 
-    # Copy binaries from workspace root
+    # Copy binaries from testing root (populated by build.sh)
     try:
         print("Copying binaries...", end=" ")
         for bin_name, dest in [
@@ -98,7 +114,9 @@ def main(args):
             ("casaverde_controller", controller_dir),
             ("casaverde_server", server_dir),
         ]:
-            src = os.path.join(project_root, "target", "release", bin_name)
+            src = os.path.join(
+                testing_root, bin_name.replace("casaverde_", ""), bin_name
+            )
             shutil.copy(src, dest)
         logger.info("Binaries copied successfully.")
         print("Done.")
@@ -107,28 +125,18 @@ def main(args):
         print("Failed.")
         sys.exit(1)
 
-    # Copy and configure necessary files
+    # Copy certificates from testing root
     try:
-        print("Copying config files and certificates...", end=" ")
-        shutil.copy(os.path.join(project_root, "casaverde_app", "config.toml"), app_dir)
+        print("Copying certificates...", end=" ")
+        shutil.copy(os.path.join(testing_root, "casaverde_app", "server.crt"), app_dir)
         shutil.copy(
-            os.path.join(project_root, "casaverde_controller", "config.toml"),
+            os.path.join(testing_root, "casaverde_controller", "server.crt"),
             controller_dir,
         )
-        for dir_path in [app_dir, controller_dir]:
-            config_path = os.path.join(dir_path, "config.toml")
-            with open(config_path, "r+") as f:
-                text = f.read()
-                text = text.replace("10.0.0.6:3003", "127.0.0.1:3003")
-                f.seek(0)
-                f.write(text)
-                f.truncate()
-        shutil.copy(os.path.join(config_dir, "server.crt"), app_dir)
-        shutil.copy(os.path.join(config_dir, "server.crt"), controller_dir)
-        logger.info("Config files and certificates copied successfully.")
+        logger.info("Certificates copied successfully.")
         print("Done.")
     except FileNotFoundError as e:
-        logger.error(f"File copy failed: {e}")
+        logger.error(f"Certificate copy failed: {e}")
         print("Failed.")
         sys.exit(1)
 
@@ -136,11 +144,11 @@ def main(args):
     processes = []
 
     # Check if port is free
-    if is_port_open("127.0.0.1", 3003):
+    if is_port_open("10.0.0.6", 3003):
         logger.error(
-            "Port 3003 is already in use. Stop the existing process and retry."
+            "Port 3003 is already in use on 10.0.0.6. Stop the existing process and retry."
         )
-        print("Error: Port 3003 is already in use.")
+        print("Error: Port 3003 is already in use on 10.0.0.6.")
         sys.exit(1)
 
     # Start socat
@@ -181,7 +189,8 @@ def main(args):
     print("Starting casaverde_server...", end=" ")
     server_bin = os.path.join(server_dir, "casaverde_server")
     env = os.environ.copy()
-    env["SERVER_IP"] = "127.0.0.1:3003"
+    env["SERVER_IP"] = "10.0.0.6:3003"
+    env["HOSTNAME"] = "blackbeard-pi"
     with open(os.path.join(server_dir, "casaverde_server.log"), "w") as server_log:
         server_p = subprocess.Popen(
             [server_bin],
@@ -192,9 +201,9 @@ def main(args):
         )
     processes.append(server_p)
     start_time = time.time()
-    while not is_port_open("127.0.0.1", 3003):
+    while not is_port_open("10.0.0.6", 3003):
         if time.time() - start_time > 10:
-            logger.error("Server failed to start on port 3003.")
+            logger.error("Server failed to start on port 10.0.0.6:3003.")
             print("Failed.")
             sys.exit(1)
         time.sleep(1)
@@ -204,12 +213,15 @@ def main(args):
     # Start controller
     print("Starting casaverde_controller...", end=" ")
     controller_bin = os.path.join(controller_dir, "casaverde_controller")
+    env = os.environ.copy()
+    env["HOSTNAME"] = "blackbeard-pi"
     with open(
         os.path.join(controller_dir, "casaverde_controller.log"), "w"
     ) as controller_log:
         controller_p = subprocess.Popen(
             [controller_bin],
             cwd=controller_dir,
+            env=env,
             stdout=controller_log,
             stderr=subprocess.STDOUT,
         )
@@ -218,19 +230,8 @@ def main(args):
     logger.info("casaverde_controller started.")
     print("Done.")
 
-    # Start app
-    print("Starting casaverde_app with --tui...", end=" ")
-    app_bin = os.path.join(app_dir, "casaverde_app")
-    with open(os.path.join(app_dir, "casaverde_app.log"), "w") as app_log:
-        app_p = subprocess.Popen(
-            [app_bin, "--tui"], cwd=app_dir, stdout=app_log, stderr=subprocess.STDOUT
-        )
-    processes.append(app_p)
-    logger.info("casaverde_app started.")
-    print("Done.")
-
     print(
-        "\nAll components started successfully. Press Ctrl+C to stop.\nLogs are in the testing root directories."
+        f"\nSimulation components started successfully. Server address: {server_address}\nRun './casaverde_app --tui' in {app_dir} or '/usr/local/bin/casaverde_app --tui' to interact with the TUI.\nPress Ctrl+C to stop simulation components.\nLogs are in the testing root directories."
     )
 
     try:
@@ -240,7 +241,10 @@ def main(args):
         print("Stopping all processes...")
         for p in processes:
             p.send_signal(signal.SIGINT)
-            p.wait(timeout=5)
+            try:
+                p.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                p.kill()
         logger.info("Cleanup complete.")
         print("Cleanup complete. Check logs for details.")
 
@@ -256,6 +260,9 @@ if __name__ == "__main__":
     parser.add_argument("--config-dir", help="Override CONFIG_DIR path")
     parser.add_argument(
         "--clean", action="store_true", help="Clean testing root before starting"
+    )
+    parser.add_argument(
+        "--no-clean", action="store_true", help="Skip cleaning testing root"
     )
     parser.add_argument(
         "--log-level", default="INFO", help="Set log level (DEBUG, INFO, etc.)"

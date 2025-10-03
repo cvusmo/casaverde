@@ -15,3 +15,12 @@ pip install --upgrade pip
 python --version  # Should show Python 3.x
 pip --version     # Should show pip version for Python 3
 python -c "import serial; print('pyserial installed:', sesial.__version__)"
+
+check if casaverde is running:
+ps aux | grep casaverde
+kill -9 <PID>
+
+python /home/echo/projects/remote/casaverde/casaverde_sim/casaverde_automate.py --testing-root ~/casaverde_test --clean
+
+for testing:
+python /home/echo/projects/remote/casaverde/casaverde_sim/casaverde_automate.py --testing-root ~/casaverde_test

@@ -13,7 +13,6 @@ use crossterm::{
 use log::info;
 use ratatui::backend::CrosstermBackend;
 use std::io;
-use tokio;
 
 #[derive(Parser)]
 struct Args {
@@ -32,7 +31,7 @@ async fn main() -> io::Result<()> {
 
     let args = Args::parse();
     let server = std::env::var("SERVER_IP")
-        .map(|ip| format!("https://{ip}:3003"))
+        .map(|ip| format!("https://{ip}"))
         .unwrap_or(args.server);
     if args.tui {
         run_tui(&server).await
@@ -48,7 +47,7 @@ async fn run_tui(_server: &str) -> io::Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = ratatui::Terminal::new(backend)?;
     let app = CasaverdeApp::new();
-    tokio::runtime::Runtime::new()?.block_on(run_app(&mut terminal, app))?;
+    run_app(&mut terminal, app).await?;
     disable_raw_mode()?;
     terminal.backend_mut().execute(LeaveAlternateScreen)?;
     terminal.show_cursor()?;
