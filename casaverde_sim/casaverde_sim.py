@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import serial
 import subprocess
 import random
@@ -19,9 +20,8 @@ def get_real_cpu_temp():
 
 
 ser = serial.Serial("/tmp/virtualcom1", baudrate=9600, timeout=1)
-
 relay_state = "OFF"
-
+fan_state = "OFF"
 print("Simulator started. Waiting for commands...")
 
 while True:
@@ -46,7 +46,7 @@ while True:
             elif "water-1" in received.lower():
                 simulated_water_level = random.uniform(0.0, 100.0)
                 response = f"WATER:{simulated_water_level:.1f}\n"
-            elif "relay-1" in received.lower() or "LIGHT1" in received.lower():
+            elif "relay-1" in received.lower() or "light1" in received.lower():
                 if "SET relay-1 ON" in received or "ON_LIGHT1" in received:
                     relay_state = "ON"
                     response = "RELAY:OK\n"
@@ -55,6 +55,15 @@ while True:
                     response = "RELAY:OK\n"
                 else:
                     response = f"RELAY:{relay_state}\n"
+            elif "fan1" in received.lower():
+                if "SET FAN1 ON" in received:
+                    fan_state = "ON"
+                    response = "FAN:OK\n"
+                elif "SET FAN1 OFF" in received:
+                    fan_state = "OFF"
+                    response = "FAN:OK\n"
+                else:
+                    response = f"FAN:{fan_state}\n"
             else:
                 response = "ACK\n"
             ser.write(response.encode("utf-8"))

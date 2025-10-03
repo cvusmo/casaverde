@@ -24,3 +24,7 @@ python /home/echo/projects/remote/casaverde/casaverde_sim/casaverde_automate.py 
 
 for testing:
 python /home/echo/projects/remote/casaverde/casaverde_sim/casaverde_automate.py --testing-root ~/casaverde_test
+
+socat:
+socat -d -d pty,raw,echo=0,link=/tmp/virtualcom0 pty,raw,echo=0,link=/tmp/virtualcom1 &
+
