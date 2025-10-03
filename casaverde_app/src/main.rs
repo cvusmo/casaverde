@@ -2,6 +2,8 @@
 // github.com/cvusmo/casaverde/casaverde_app
 // src/main.rs
 
+use tokio::time::Duration;
+use casaverde_app::tui::{handle_tui_events, render_tui};
 use casaverde_app::app::{run_app, CasaverdeApp};
 use casaverde_app::touch::run_touchscreen;
 use casaverde_utils;
@@ -46,8 +48,16 @@ async fn run_tui(_server: &str) -> io::Result<()> {
     stdout.execute(LeaveAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = ratatui::Terminal::new(backend)?;
-    let app = CasaverdeApp::new();
-    run_app(&mut terminal, app).await?;
+    let mut app = CasaverdeApp::new();
+    loop {
+        if app.quit {
+            break;
+        }
+        app.sensor_data.update_devices().await;
+        render_tui(&mut terminal, &app)?;
+        handle_tui_events(&mut app)?;
+        tokio::time::sleep(Duration::from_secs(1)).await; // Update every second
+    }
     disable_raw_mode()?;
     terminal.backend_mut().execute(LeaveAlternateScreen)?;
     terminal.show_cursor()?;

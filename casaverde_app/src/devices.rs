@@ -126,7 +126,7 @@ impl DeviceData {
         let device_count = config.configs.len().min(16);
         config.configs.truncate(device_count);
 
-        let client_id = Uuid::new_v4().to_string();
+        let client_id = "blackbeard-pi".to_string(); // Match controller's client ID
         let client = AppClient::new(&config.server, client_id.clone());
 
         let states = [true; Sensor::ALL.len()];
@@ -161,8 +161,10 @@ impl DeviceData {
                             _ => None,
                         };
 
-                        let value = readings.iter()
+                        let value = readings
+                            .iter()
                             .find(|(client_id, _)| client_id == &self.client.client_id)
+                            .or_else(|| readings.iter().find(|(client_id, _)| client_id == "blackbeard-pi"))
                             .and_then(|(_, devs)| devs.iter().find(|d| d.id == config.id))
                             .and_then(|d| d.value);
 
@@ -183,6 +185,7 @@ impl DeviceData {
                                 }
                             }
                         } else if config.id == "relay-1" {
+                            self.device_values[i] = value;
                             devices.push(DeviceReading {
                                 id: config.id.clone(),
                                 value,
