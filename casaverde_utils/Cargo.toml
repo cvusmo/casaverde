@@ -10,6 +10,7 @@ edition.workspace = true
 log.workspace = true
 env_logger.workspace = true
 chrono.workspace = true
+tokio.workspace = true
 
 [lib]
 name = "casaverde_utils"

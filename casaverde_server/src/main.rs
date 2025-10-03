@@ -8,16 +8,16 @@ use axum::{
 };
 use axum_server::tls_rustls::RustlsConfig;
 use dirs::config_dir;
-use env_logger;
 use log::info;
 use std::net::SocketAddr;
 use std::{fs, io};
 
 use casaverde_server::handlers;
+use casaverde_utils; 
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
-    env_logger::init();
+    casaverde_utils::init_logger("casaverde_server", log::LevelFilter::Info)?;
     info!("Starting casaverde_server");
 
     let addr = get_server_addr();

@@ -1,4 +1,5 @@
 # casaverde_controller/Cargo.toml
+
 [package]
 name = "casaverde_controller"
 version.workspace = true
@@ -15,3 +16,7 @@ serialport.workspace = true
 tokio.workspace = true
 toml.workspace = true
 casaverde_utils = { path = "../casaverde_utils" }
+
+[[bin]]
+name = "casaverde_controller"
+path = "src/main.rs"

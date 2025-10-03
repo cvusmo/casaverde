@@ -3,8 +3,8 @@
 // src/controller.rs
 
 use log::info;
-use tokio::sync::mpsc::Sender;
 use serde_json::Value;
+use tokio::time::interval;
 
 #[derive(Debug, Clone, Default)]
 pub struct SensorState {
@@ -31,57 +31,83 @@ pub enum Command {
     SetPWM(String, u8),
 }
 
-pub fn process_remote_readings(readings: &Value, controller_id: &str) -> Vec<Command> {
-    let mut cmds = Vec::new();
-    if let Some(client_readings) = readings.as_array() {
-        for client_reading in client_readings.iter() {
-            if let Some(arr) = client_reading.as_array() {
-                if let (Some(id), Some(devices)) = (arr.get(0).and_then(|id| id.as_str()), arr.get(1)) {
-                    if id == controller_id {
-                        if let Some(devices_array) = devices.as_array() {
-                            for device in devices_array {
-                                if let Some(obj) = device.as_object() {
-                                    let id = obj.get("id").and_then(|v| v.as_str()).unwrap_or("");
-                                    let value = obj.get("value").and_then(|v| v.as_f64());
-                                    if id == "blackbeard-cpu" && value.unwrap_or(0.0) > 40.0 {
-                                        cmds.push(Command::TurnOnCooling("FAN1".to_string()));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+impl Command {
+    pub fn id(&self) -> &str {
+        match self {
+            Command::TurnOnCooling(id) => id,
+            Command::TurnOffCooling(id) => id,
+            Command::TurnOnMoisture(id) => id,
+            Command::TurnOffMoisture(id) => id,
+            Command::OpenValve(id) => id,
+            Command::CloseValve(id) => id,
+            Command::TurnOnSolar(id) => id,
+            Command::TurnOffSolar(id) => id,
+            Command::TurnOnHumidity(id) => id,
+            Command::TurnOffHumidity(id) => id,
+            Command::SetPWM(id, _) => id,
         }
     }
-    cmds
+}
+
+pub fn process_remote_readings(readings: &Value, controller_id: &str) -> Vec<Command> {
+    readings
+        .as_array()
+        .map(|client_readings| {
+            client_readings
+                .iter()
+                .filter_map(|client_reading| {
+                    let arr: &[Value] = client_reading.as_array()?.as_slice();
+                    let [id, devices] = arr else { return None };
+                    (id.as_str() == Some(controller_id)).then(|| {
+                        devices
+                            .as_array()
+                            .map(|devices_array| {
+                                devices_array
+                                    .iter()
+                                    .filter_map(|device| {
+                                        device
+                                            .as_object()
+                                            .and_then(|obj| {
+                                                let id = obj.get("id")?.as_str()?;
+                                                let value = obj.get("value")?.as_f64()?;
+                                                (id == "blackbeard-cpu" && value > 40.0)
+                                                    .then(|| Command::TurnOnCooling("FAN1".to_string()))
+                                            })
+                                    })
+                                    .collect::<Vec<_>>()
+                            })
+                            .unwrap_or_default()
+                    })
+                })
+                .flatten()
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default()
 }
 
 pub fn process_local_rules(_config: &crate::config::Config, local_temp: f64) -> Vec<Command> {
-    let mut cmds = Vec::new();
-    if local_temp > 35.0 {
-        cmds.push(Command::TurnOnCooling("FAN1".to_string()));
-    }
-    cmds
+    (local_temp > 35.0)
+        .then(|| vec![Command::TurnOnCooling("FAN1".to_string())])
+        .unwrap_or_default()
 }
 
 pub async fn run_light_timer(
-    light_id: String,
+    relay_id: String,
     on_hours: u64,
     off_hours: u64,
-    tx: Sender<Command>,
+    tx: tokio::sync::mpsc::Sender<Command>,
 ) {
-    loop {
-        info!("Timer: turning ON {}", light_id);
-        if tx.send(Command::TurnOnSolar(light_id.clone())).await.is_err() {
-            break;
-        }
-        tokio::time::sleep(std::time::Duration::from_secs(on_hours * 3600)).await;
+    info!("Starting light timer for relay {} with {}h ON / {}h OFF cycle", relay_id, on_hours, off_hours);
+    let mut interval = interval(tokio::time::Duration::from_secs(15));
+    let mut is_on = true;
 
-        info!("Timer: turning OFF {}", light_id);
-        if tx.send(Command::TurnOffSolar(light_id.clone())).await.is_err() {
+    loop {
+        interval.tick().await;
+        let cmd = if is_on { Command::TurnOnSolar(relay_id.clone()) } else { Command::TurnOffSolar(relay_id.clone()) };
+        if tx.send(cmd).await.is_err() {
             break;
         }
-        tokio::time::sleep(std::time::Duration::from_secs(off_hours * 3600)).await;
+        info!("Toggled light to {} at {:?}", if is_on { "ON" } else { "OFF" }, tokio::time::Instant::now());
+        is_on = !is_on;
     }
 }

@@ -1,23 +1,24 @@
 // casaverde_utils/src/lib.rs
-use chrono::Utc;
 use env_logger::{Builder, Target};
 use log::LevelFilter;
 use std::fs::File;
 use std::io::Write;
+use tokio::time::Instant;
 
-pub fn init_logger(
-    app_name: &str,
-    log_level: LevelFilter,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let log_file_path = format!("/home/echo/projects/remote/casaverde/logs/{}.log", app_name);
+pub fn init_logger(app_name: &str, log_level: LevelFilter) -> Result<(), std::io::Error> {
+    let log_file_path = format!(
+        "/home/echo/projects/remote/casaverde/casaverde_test/{}.log",
+        app_name
+    );
     let log_file = File::create(&log_file_path)?;
 
     Builder::new()
         .format(|buf, record| {
+            let timestamp = Instant::now().elapsed().as_secs();
             writeln!(
                 buf,
                 "{} [{}] - {}: {}",
-                Utc::now().format("%Y-%m-%dT%H:%M:%SZ"),
+                timestamp,
                 record.level(),
                 record.module_path().unwrap_or("unknown"),
                 record.args()

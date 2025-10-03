@@ -8,7 +8,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Acris Software Ltd. Co."]
 edition = "2024"
 
@@ -33,4 +33,4 @@ clap = { version = "4.5.42", features = ["derive"] }
 crossterm = "0.29.0"
 ratatui = "0.29.0"
 regex = "1.11.3"
-chrono = "0.4.38"  
+chrono = "0.4.38"

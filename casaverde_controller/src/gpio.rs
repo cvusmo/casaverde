@@ -2,48 +2,40 @@
 // github.com/cvusmo/casaverde/casaverde_controller
 // src/gpio.rs
 
-use std::fs::{read_dir, File};
-use std::io::Read;
+use std::fs;
 use std::path::Path;
 
 pub fn read_temperature() -> Option<f32> {
-    let thermal_dir = Path::new("/sys/class/hwmon/");
-    if let Ok(entries) = read_dir(thermal_dir) {
-        for entry in entries.flatten() {
+    fs::read_dir(Path::new("/sys/class/hwmon/"))
+        .ok()?
+        .flatten()
+        .find_map(|entry| {
             let path = entry.path();
             if path.is_dir() {
-                let name_path = path.join("name");
-                let mut name = String::new();
-                if let Ok(mut file) = File::open(&name_path) {
-                    if file.read_to_string(&mut name).is_ok() && name.trim() == "coretemp" {
-                        let mut i = 1;
-                        loop {
-                            let label_path = path.join(format!("temp{}_label", i));
-                            if !label_path.exists() {
-                                break;
-                            }
-                            let mut label = String::new();
-                            if let Ok(mut file) = File::open(&label_path) {
-                                if file.read_to_string(&mut label).is_ok()
-                                    && label.trim() == "Package id 0"
-                                {
-                                    let temp_path = path.join(format!("temp{}_input", i));
-                                    let mut temp_str = String::new();
-                                    if let Ok(mut file) = File::open(&temp_path) {
-                                        if file.read_to_string(&mut temp_str).is_ok() {
-                                            if let Ok(temp_milli) = temp_str.trim().parse::<f32>() {
-                                                return Some(temp_milli / 1000.0);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            i += 1;
+                let name = fs::read_to_string(path.join("name"))
+                    .ok()?
+                    .trim()
+                    .to_string();
+                if name == "coretemp" {
+                    (1..).find_map(|i| {
+                        let label_path = path.join(format!("temp{}_label", i));
+                        if !label_path.exists() {
+                            return None;
                         }
-                    }
+                        let label = fs::read_to_string(label_path).ok()?.trim().to_string();
+                        if label == "Package id 0" {
+                            let temp_str =
+                                fs::read_to_string(path.join(format!("temp{}_input", i))).ok()?;
+                            temp_str.trim().parse::<f32>().ok().map(|t| t / 1000.0)
+                        } else {
+                            None
+                        }
+                    })
+                } else {
+                    None
                 }
+            } else {
+                None
             }
-        }
-    }
-    None
+        })
 }

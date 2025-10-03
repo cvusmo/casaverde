@@ -6,23 +6,27 @@ use crate::models::{Command, ConfigData, ConfigEntry, DeviceReading, SensorReadi
 use log::info;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use tokio::time::Instant;
+
+type TempCacheValue = (Vec<DeviceReading>, Instant);
+type CommandCacheValue = (Vec<Command>, Instant);
+type ConfigCacheValue = ConfigEntry;
 
 lazy_static::lazy_static! {
-    static ref TEMP_CACHE: Arc<Mutex<HashMap<String, (Vec<DeviceReading>, Instant)>>> = Arc::new(Mutex::new(HashMap::new()));
-    static ref COMMAND_CACHE: Arc<Mutex<HashMap<String, (Vec<Command>, Instant)>>> = Arc::new(Mutex::new(HashMap::new()));
-    static ref CONFIG_CACHE: Arc<Mutex<HashMap<String, ConfigEntry>>> = Arc::new(Mutex::new(HashMap::new()));
+    static ref TEMP_CACHE: Arc<Mutex<HashMap<String, TempCacheValue>>> = Arc::new(Mutex::new(HashMap::new()));
+    static ref COMMAND_CACHE: Arc<Mutex<HashMap<String, CommandCacheValue>>> = Arc::new(Mutex::new(HashMap::new()));
+    static ref CONFIG_CACHE: Arc<Mutex<HashMap<String, ConfigCacheValue>>> = Arc::new(Mutex::new(HashMap::new()));
 }
 
-pub fn get_temp_cache() -> Arc<Mutex<HashMap<String, (Vec<DeviceReading>, Instant)>>> {
+pub fn get_temp_cache() -> Arc<Mutex<HashMap<String, TempCacheValue>>> {
     TEMP_CACHE.clone()
 }
 
-pub fn get_command_cache() -> Arc<Mutex<HashMap<String, (Vec<Command>, Instant)>>> {
+pub fn get_command_cache() -> Arc<Mutex<HashMap<String, CommandCacheValue>>> {
     COMMAND_CACHE.clone()
 }
 
-pub fn get_config_cache() -> Arc<Mutex<HashMap<String, ConfigEntry>>> {
+pub fn get_config_cache() -> Arc<Mutex<HashMap<String, ConfigCacheValue>>> {
     CONFIG_CACHE.clone()
 }
 
@@ -57,11 +61,13 @@ pub fn insert_config_cache(controller_id: String, new_config: ConfigData, revert
             }
         }
     } else {
-        let entry = cache.entry(controller_id.clone()).or_insert(ConfigEntry {
-            current: new_config.clone(),
-            backup: None,
-        });
-        entry.backup = Some(entry.current.clone());
+        let entry = cache
+            .entry(controller_id.clone())
+            .or_insert_with(|| ConfigEntry {
+                current: new_config.clone(),
+                backup: None,
+            });
+        entry.backup.get_or_insert(entry.current.clone());
         entry.current = new_config;
         info!("Updated config for {}", controller_id);
     }

@@ -9,139 +9,86 @@ use serialport;
 
 pub fn init_serial(
     config: &crate::config::Config,
-) -> Result<Box<dyn serialport::SerialPort>, Box<dyn std::error::Error>> {
+) -> Result<Box<dyn serialport::SerialPort>, serialport::Error> {
     let port_name = config.serial_port.as_ref().ok_or_else(|| {
         log::error!("Serial port not configured in config.toml");
-        std::io::Error::new(std::io::ErrorKind::NotFound, "Serial port not found")
+        serialport::Error::new(serialport::ErrorKind::NoDevice, "Serial port not found")
     })?;
-    let port = serialport::new(port_name, 9600)
+    serialport::new(port_name, 9600)
         .timeout(std::time::Duration::from_millis(1000))
         .open()
-        .map_err(|e| {
-            log::error!("Failed to open serial port {port_name}: {e}");
-            e
-        })?;
-    info!("Serial port {port_name} initialized at 9600 baud");
-    Ok(port)
+        .map(|port| {
+            info!("Serial port {port_name} initialized at 9600 baud");
+            port
+        })
 }
 
 pub fn send_command(
     port: &mut dyn serialport::SerialPort,
     cmd: &Command,
-) -> Result<(), Box<dyn std::error::Error>> {
-    match cmd {
-        Command::TurnOnCooling(id) => {
-            let command = format!("SET {id} ON\n");
-            port.write_all(command.as_bytes())?;
-            info!("Sent command to turn ON relay {id}");
-        }
-        Command::TurnOffCooling(id) => {
-            let command = format!("SET {id} OFF\n");
-            port.write_all(command.as_bytes())?;
-            info!("Sent command to turn OFF relay {id}");
-        }
-        Command::TurnOnMoisture(id) => {
-            let command = format!("SET {id} ON\n");
-            port.write_all(command.as_bytes())?;
-            info!("Sent command TurnOnMoisture to relay {id}");
-        }
-        Command::TurnOffMoisture(id) => {
-            let command = format!("SET {id} OFF\n");
-            port.write_all(command.as_bytes())?;
-            info!("Sent command TurnOffMoisture to relay {id}");
-        }
-        Command::OpenValve(id) => {
-            let command = format!("SET {id} ON\n");
-            port.write_all(command.as_bytes())?;
-            info!("Sent command OpenValve to relay {id}");
-        }
-        Command::CloseValve(id) => {
-            let command = format!("SET {id} OFF\n");
-            port.write_all(command.as_bytes())?;
-            info!("Sent command CloseValve on relay {id}");
-        }
-        Command::TurnOnSolar(id) => {
-            let command = format!("SET {id} ON\n");
-            port.write_all(command.as_bytes())?;
-            info!("Sent command TurnOnSolar on relay {id}");
-        }
-        Command::TurnOffSolar(id) => {
-            let command = format!("SET {id} OFF\n");
-            port.write_all(command.as_bytes())?;
-            info!("Sent command TurnOffSolar on relay {id}");
-        }
-        Command::TurnOnHumidity(id) => {
-            let command = format!("SET {id} ON\n");
-            port.write_all(command.as_bytes())?;
-            info!("Sent command TurnOnHumidity on relay {id}");
-        }
-        Command::TurnOffHumidity(id) => {
-            let command = format!("SET {id} OFF\n");
-            port.write_all(command.as_bytes())?;
-            info!("Sent command TurnOffHumidity on relay {id}");
-        }
-        Command::SetPWM(id, pwm) => {
-            let command = format!("PWM_{id}_{pwm}\n");
-            port.write_all(command.as_bytes())?;
-            info!("Sent command SetPWM {pwm} on relay {id}");
-        }
-    }
+) -> Result<(), serialport::Error> {
+    let (command, msg) = match cmd {
+        Command::TurnOnCooling(id) => (format!("SET {id} ON\n"), "turn ON"),
+        Command::TurnOffCooling(id) => (format!("SET {id} OFF\n"), "turn OFF"),
+        Command::TurnOnMoisture(id) => (format!("SET {id} ON\n"), "TurnOnMoisture"),
+        Command::TurnOffMoisture(id) => (format!("SET {id} OFF\n"), "TurnOffMoisture"),
+        Command::OpenValve(id) => (format!("SET {id} ON\n"), "OpenValve"),
+        Command::CloseValve(id) => (format!("SET {id} OFF\n"), "CloseValve"),
+        Command::TurnOnSolar(id) => (format!("SET {id} ON\n"), "TurnOnSolar"),
+        Command::TurnOffSolar(id) => (format!("SET {id} OFF\n"), "TurnOffSolar"),
+        Command::TurnOnHumidity(id) => (format!("SET {id} ON\n"), "TurnOnHumidity"),
+        Command::TurnOffHumidity(id) => (format!("SET {id} OFF\n"), "TurnOffHumidity"),
+        Command::SetPWM(id, pwm) => (format!("PWM_{id}_{pwm}\n"), "SetPWM"),
+    };
+    port.write_all(command.as_bytes())?;
+    info!("Sent command {msg} on relay {}", cmd.id());
     Ok(())
 }
 
 pub fn read_sensor_data(port: &mut dyn serialport::SerialPort) -> Option<Vec<DeviceReading>> {
     let mut buffer = [0u8; 128];
-    port.set_timeout(std::time::Duration::from_millis(500))
-        .ok()?;
-    match port.read(&mut buffer) {
-        Ok(n) if n > 0 => {
-            let response = String::from_utf8_lossy(&buffer[..n]).trim().to_string();
-            info!("Received from simulator: {}", response);
-            let mut readings = Vec::new();
-            if response.starts_with("TEMP:") {
-                if let Ok(value) = response[5..].parse::<f32>() {
-                    readings.push(DeviceReading {
-                        id: "blackbeard-cpu".to_string(),
-                        value: Some(value),
-                    });
-                }
-            } else if response.starts_with("SOLAR:") {
-                if let Ok(value) = response[6..].parse::<f32>() {
-                    readings.push(DeviceReading {
-                        id: "solar-1".to_string(),
-                        value: Some(value),
-                    });
-                }
-            } else if response.starts_with("MOISTURE:") {
-                if let Ok(value) = response[9..].parse::<f32>() {
-                    readings.push(DeviceReading {
-                        id: "moisture-1".to_string(),
-                        value: Some(value),
-                    });
-                }
-            } else if response.starts_with("HUMIDITY:") {
-                if let Ok(value) = response[9..].parse::<f32>() {
-                    readings.push(DeviceReading {
-                        id: "humidity-1".to_string(),
-                        value: Some(value),
-                    });
-                }
-            } else if response.starts_with("WATER:") {
-                if let Ok(value) = response[6..].parse::<f32>() {
-                    readings.push(DeviceReading {
-                        id: "water-1".to_string(),
-                        value: Some(value),
-                    });
-                }
-            } else if response.starts_with("RELAY:") {
-                let value = if response == "RELAY:OK" { 1.0 } else { 0.0 }; // Simplified
-                readings.push(DeviceReading {
-                    id: "relay-1".to_string(),
+    if port
+        .set_timeout(std::time::Duration::from_millis(500))
+        .is_ok()
+    {
+        if let Ok(n) = port.read(&mut buffer) {
+            if n > 0 {
+                let response = String::from_utf8_lossy(&buffer[..n]).trim().to_string();
+                info!("Received from simulator: {}", response);
+                let mut readings = Vec::new();
+                match_response(&response, &mut readings);
+                return Some(readings);
+            }
+        }
+    }
+    None
+}
+
+fn match_response(response: &str, readings: &mut Vec<DeviceReading>) {
+    macro_rules! match_sensor {
+        ($prefix:expr, $id:expr, $readings:expr) => {
+            if let Some(value) = response
+                .strip_prefix($prefix)
+                .and_then(|v| v.parse::<f32>().ok())
+            {
+                $readings.push(DeviceReading {
+                    id: $id.to_string(),
                     value: Some(value),
                 });
+                return;
             }
-            Some(readings)
-        }
-        _ => None,
+        };
+    }
+
+    match_sensor!("TEMP:", "blackbeard-cpu", readings);
+    match_sensor!("SOLAR:", "solar-1", readings);
+    match_sensor!("MOISTURE:", "moisture-1", readings);
+    match_sensor!("HUMIDITY:", "humidity-1", readings);
+    match_sensor!("WATER:", "water-1", readings);
+    if response.starts_with("RELAY:") {
+        readings.push(DeviceReading {
+            id: "relay-1".to_string(),
+            value: Some(if response == "RELAY:OK" { 1.0 } else { 0.0 }),
+        });
     }
 }
