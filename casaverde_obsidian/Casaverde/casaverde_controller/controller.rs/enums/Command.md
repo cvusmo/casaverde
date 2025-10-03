@@ -1,0 +1,1 @@
+Defines control commands with variants TurnOnCooling (String) and TurnOffCooling (String) where the String represents the device ID used to instruct the micro controller via serial.

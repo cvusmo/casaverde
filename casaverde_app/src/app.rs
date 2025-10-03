@@ -1,21 +1,22 @@
-// Copyright 2025 Nicholas Jordan. All Rights Reserved.
+// Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 // github.com/cvusmo/casaverde/casaverde_app
 // src/app.rs
 
-use crate::devices::DeviceData;
+use crate::devices::{DeviceData, Sensor};
 use ratatui::backend::CrosstermBackend;
 use std::io;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Screen {
-    Devices,   
-    Monitoring, 
+    Devices,
+    Monitoring,
+    Config,
 }
 
 pub struct CasaverdeApp {
     pub sensor_data: DeviceData,
     pub selected: usize,
-    pub should_quit: bool,
+    pub quit: bool,
     pub screen: Screen,
 }
 
@@ -24,7 +25,7 @@ impl CasaverdeApp {
         Self {
             sensor_data: DeviceData::new("config.toml"),
             selected: 0,
-            should_quit: false,
+            quit: false,
             screen: Screen::Devices,
         }
     }
@@ -42,14 +43,29 @@ impl CasaverdeApp {
     }
 
     pub fn quit(&mut self) {
-        self.should_quit = true;
+        self.quit = true;
     }
 
     pub fn switch_screen(&mut self) {
         self.screen = match self.screen {
             Screen::Devices => Screen::Monitoring,
-            Screen::Monitoring => Screen::Devices,
+            Screen::Monitoring => Screen::Config,
+            Screen::Config => Screen::Devices,
         };
+    }
+
+    pub fn toggle_selected_sensor(&mut self) {
+        if self.screen == Screen::Devices {
+            let sensor = match self.sensor_data.config.configs[self.selected].id.as_str() {
+                "blackbeard-cpu" => Sensor::Temperature,
+                "solar-1" => Sensor::Solar,
+                "moisture-1" => Sensor::Moisture,
+                "humidity-1" => Sensor::Humidity,
+                "water-1" => Sensor::Water,
+                _ => return,
+            };
+            self.sensor_data.toggle_sensor(sensor);
+        }
     }
 }
 
@@ -59,7 +75,7 @@ pub async fn run_app(
 ) -> io::Result<()> {
     use crate::tui::{handle_tui_events, render_tui};
     loop {
-        if app.should_quit {
+        if app.quit {
             break;
         }
         app.sensor_data.update_devices().await;

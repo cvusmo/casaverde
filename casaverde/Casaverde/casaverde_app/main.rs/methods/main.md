@@ -1,1 +1,0 @@
-Serves as the application entry point

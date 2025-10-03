@@ -1,0 +1,1 @@
+Processes user input events to update the [[CasaverdeApp]] state supporting navigation, screen switching and quitting.

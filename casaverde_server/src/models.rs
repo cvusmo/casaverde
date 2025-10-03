@@ -1,4 +1,4 @@
-// Copyright 2025 Nicholas Jordan. All Rights Reserved.
+// Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 // github.com/cvusmo/casaverde/casaverde_server
 // src/models.rs
 
@@ -14,4 +14,39 @@ pub struct DeviceReading {
 pub struct SensorReading {
     pub client_id: String,
     pub devices: Vec<DeviceReading>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Command {
+    pub action: String,
+    pub device_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CommandPayload {
+    pub controller_id: String,
+    pub commands: Vec<Command>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ConfigEntry {
+    pub current: ConfigData,
+    pub backup: Option<ConfigData>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ConfigData {
+    pub server: String,
+    pub controller_id: String,
+    pub serial_port: Option<String>,
+    pub light_relay_id: String,
+    pub light_on_hours: u64,
+    pub light_off_hours: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ConfigPayload {
+    pub controller_id: String,
+    pub config: ConfigData,
+    pub revert: bool,
 }

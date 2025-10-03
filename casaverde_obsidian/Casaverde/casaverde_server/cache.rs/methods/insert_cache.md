@@ -1,0 +1,1 @@
+Insert new data into cache with timestamp

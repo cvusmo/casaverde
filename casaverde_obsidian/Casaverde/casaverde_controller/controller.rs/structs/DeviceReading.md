@@ -1,0 +1,1 @@
+Represents a device reading with an id (String) and an optional value (f32), used to deserialize server data.

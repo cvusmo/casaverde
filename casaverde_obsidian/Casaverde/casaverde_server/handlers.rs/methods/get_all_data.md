@@ -1,0 +1,1 @@
+Handles GET requests to the endpoint, returning all cached sensor data for all clients.

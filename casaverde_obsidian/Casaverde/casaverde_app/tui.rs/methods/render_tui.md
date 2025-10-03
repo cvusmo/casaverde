@@ -1,0 +1,1 @@
+Renders the TUI based on the current [[CasaverdeApp]] state, organizing the layout into a title, main content and status bar.

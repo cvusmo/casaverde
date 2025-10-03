@@ -1,1 +1,0 @@
-Creates a new [[Casaverde/casaverde_app/sensors.rs/structs/SensorData|SensorData]] instance with default sensor states and an HTTP client for fetching data

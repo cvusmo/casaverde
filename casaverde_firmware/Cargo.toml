@@ -1,0 +1,16 @@
+[package]
+name = "casaverde_firmware"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+lto = true
+opt-level = 3
+
+[target.'cfg(target_arch = "avr")'.dependencies]

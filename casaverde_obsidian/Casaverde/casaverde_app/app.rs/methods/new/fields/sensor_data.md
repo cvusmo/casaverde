@@ -1,0 +1,1 @@
+[[DeviceData]] instance managing sensor states and temperature data.

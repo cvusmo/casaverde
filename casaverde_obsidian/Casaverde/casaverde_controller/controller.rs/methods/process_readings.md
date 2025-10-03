@@ -1,0 +1,1 @@
+Processes a slice of [[Casaverde/casaverde_controller/controller.rs/structs/CachedData|CachedData]] instances, generating a vector based on temperature thresholds, returning Vec<[[Command]]> with logging for each decision.

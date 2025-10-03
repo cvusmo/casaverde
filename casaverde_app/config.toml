@@ -1,13 +1,46 @@
-server = "https://10.0.0.12:3000"
+# Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
+# config for casaverde_app
+
+server = "https://10.0.0.6:3003"
 
 [[configs]]
-id = "sensor1"
+id = "blackbeard-cpu"
 type = "temperature"
-endpoint = "https://10.0.0.12:3000/sensor_data"
-interval = 5
+endpoint = "/sensor_data"
+interval = 15
+serial_port = ""
 
 [[configs]]
-id = "sensor2"
+id = "solar-1"
+type = "solar"
+endpoint = "/sensor_data"
+serial_port = ""
+interval = 15
+
+[[configs]]
+id = "moisture-1"
+type = "moisture"
+endpoint = "/sensor_data"
+serial_port = ""
+interval = 15
+
+[[configs]]
+id = "humidity-1"
 type = "humidity"
-endpoint = "https://10.0.0.12:3000/sensor_data"
-interval = 10
+endpoint = "/sensor_data"
+serial_port = ""
+interval = 15
+
+[[configs]]
+id = "water-1"
+type = "water"
+endpoint = "/sensor_data"
+serial_port = ""
+interval = 15
+
+[[configs]]
+id = "relay-1"
+type = "relay"
+endpoint = "/relay_control"
+serial_port = ""
+interval = 15

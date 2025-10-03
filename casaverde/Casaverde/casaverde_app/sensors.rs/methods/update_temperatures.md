@@ -1,1 +1,0 @@
-Updates temperature data from the casaverde_server if the Temperature sensor is enabled and at least 5 seconds have elapsed since the last update

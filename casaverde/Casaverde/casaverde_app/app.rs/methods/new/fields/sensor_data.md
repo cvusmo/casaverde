@@ -1,1 +1,0 @@
-[[Casaverde/casaverde_app/app.rs/SensorData]] instance managing sensor states and temperature data.

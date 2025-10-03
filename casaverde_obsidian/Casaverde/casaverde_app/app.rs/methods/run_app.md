@@ -1,0 +1,1 @@
+The main application loop that renders the TUI, handles events and updates sensor data.

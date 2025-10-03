@@ -1,1 +1,0 @@
-Runs the main TUI application loop

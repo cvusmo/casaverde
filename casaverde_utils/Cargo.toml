@@ -1,0 +1,17 @@
+# /casaverde/casaverde_utils/Cargo.toml
+
+[package]
+name = "casaverde_utils"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[dependencies]
+log.workspace = true
+env_logger.workspace = true
+chrono.workspace = true
+tokio.workspace = true
+
+[lib]
+name = "casaverde_utils"
+path = "src/lib.rs"

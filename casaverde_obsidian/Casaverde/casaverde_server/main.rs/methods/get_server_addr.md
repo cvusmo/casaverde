@@ -1,0 +1,1 @@
+Retrieves the server's bind address by parsing the SERVER_IP env variable

@@ -1,0 +1,1 @@
+Contains a client_id (String) and a vector of [[Casaverde/casaverde_controller/controller.rs/structs/DeviceReading|DeviceReading]] instances, representing cached data from the [[casaverde_server]]

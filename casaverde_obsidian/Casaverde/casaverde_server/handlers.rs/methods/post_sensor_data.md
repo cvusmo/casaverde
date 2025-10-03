@@ -1,0 +1,1 @@
+Handles POST requests to the endpoint, accepting new sensor data, and storing it in the cache
