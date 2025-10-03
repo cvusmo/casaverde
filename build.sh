@@ -36,31 +36,37 @@ log_with_timestamp() {
 
 build_project() {
     local project="$1"
-    log_with_timestamp "Building $project for $OS..."
+    local mode="$2"  # "debug" or "release"
+    log_with_timestamp "Building $project for $OS in $mode mode..."
     if [[ ! -d "$PROJECT_ROOT/$project" ]]; then
         log_with_timestamp "Error: Project directory $PROJECT_ROOT/$project does not exist"
         exit 1
     fi
     pushd "$PROJECT_ROOT/$project" >/dev/null || { log_with_timestamp "Error: Failed to enter $project directory"; exit 1; }
+    local cargo_args=""
+    if [[ "$mode" == "release" ]]; then
+        cargo_args="--release"
+    fi
     if [[ "$USE_TARGET_FLAG" == true ]]; then
-        cargo build --release --target "$RUST_TARGET" 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Error: Build failed for $project"; exit 1; }
+        cargo build $cargo_args --target "$RUST_TARGET" 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Error: Build failed for $project"; exit 1; }
     else
-        cargo build --release 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Error: Build failed for $project"; exit 1; }
+        cargo build $cargo_args 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Error: Build failed for $project"; exit 1; }
     fi
     popd >/dev/null
-    log_with_timestamp "Build complete: $project"
+    log_with_timestamp "Build complete: $project in $mode mode"
 }
 
 install_binary() {
     local project="$1"
+    local mode="$2"  # "debug" or "release"
     local bin_name="casaverde_${project##casaverde_}"
     local bin_path
     if [[ "$USE_TARGET_FLAG" == true ]]; then
-        bin_path="$PROJECT_ROOT/$project/target/$RUST_TARGET/release/$bin_name"
+        bin_path="$PROJECT_ROOT/$project/target/$RUST_TARGET/$mode/$bin_name"
     else
-        bin_path="$PROJECT_ROOT/$project/target/release/$bin_name"
+        bin_path="$PROJECT_ROOT/$project/target/$mode/$bin_name"
     fi
-    local workspace_bin_path="$PROJECT_ROOT/target/release/$bin_name"
+    local workspace_bin_path="$PROJECT_ROOT/target/$mode/$bin_name"
     log_with_timestamp "Installing $project binary to $INSTALL_DIR"
     if [[ ! -f "$bin_path" && -f "$workspace_bin_path" ]]; then
         bin_path="$workspace_bin_path"
@@ -85,7 +91,7 @@ setup_test_environment() {
     mkdir -p "$CONFIG_DIR" || { log_with_timestamp "Error: Failed to create $CONFIG_DIR"; exit 1; }
     for project in "casaverde_app" "casaverde_controller" "casaverde_server"; do
         local bin_name="casaverde_${project##casaverde_}"
-        local bin_path="$PROJECT_ROOT/target/release/$bin_name"
+        local bin_path="$PROJECT_ROOT/target/debug/$bin_name"
         local dest_dir="$TESTING_ROOT/$project"
         if [[ -f "$bin_path" ]]; then
             cp "$bin_path" "$dest_dir/$bin_name" || {
@@ -165,27 +171,30 @@ open_port_3003() {
 }
 
 main() {
-    local action="${1:-build}"
+    local action="${1:-debug}"
     log_with_timestamp "Starting build process: $action"
     case "$action" in
-        "build")
-            log_with_timestamp "Starting build process for all components..."
+        "debug")
+            log_with_timestamp "Starting debug build process for all components..."
             for project in "casaverde_utils" "casaverde_server" "casaverde_app" "casaverde_controller"; do
-                build_project "$project"
+                build_project "$project" "debug"
             done
             for project in "casaverde_server" "casaverde_app" "casaverde_controller"; do
-                install_binary "$project"
-            done
-            log_with_timestamp "Build and installation complete for $OS"
-            ;;
-        "test")
-            log_with_timestamp "Starting test environment build..."
-            for project in "casaverde_utils" "casaverde_server" "casaverde_app" "casaverde_controller"; do
-                build_project "$project"
+                install_binary "$project" "debug"
             done
             setup_test_environment
             open_port_3003
-            log_with_timestamp "Test environment build complete"
+            log_with_timestamp "Debug build, installation, and test environment setup complete for $OS"
+            ;;
+        "release")
+            log_with_timestamp "Starting release build process for all components..."
+            for project in "casaverde_utils" "casaverde_server" "casaverde_app" "casaverde_controller"; do
+                build_project "$project" "release"
+            done
+            for project in "casaverde_server" "casaverde_app" "casaverde_controller"; do
+                install_binary "$project" "release"
+            done
+            log_with_timestamp "Release build and installation complete for $OS"
             ;;
         "clean")
             log_with_timestamp "Cleaning build artifacts..."
@@ -193,14 +202,17 @@ main() {
                 log_with_timestamp "Error: Clean failed"
                 exit 1
             }
-            [[ -d "$TESTING_ROOT" ]] && rm -rf "$TESTING_ROOT" || {
-                log_with_timestamp "Error: Failed to remove $TESTING_ROOT"
-                exit 1
-            }
+            if [[ -d "$TESTING_ROOT" ]]; then
+                if ! rm -rf "$TESTING_ROOT" 2>/dev/null; then
+                    log_with_timestamp "Warning: Failed to remove $TESTING_ROOT, possibly due to permissions or usage. Please remove manually: sudo rm -rf $TESTING_ROOT"
+                else
+                    log_with_timestamp "Removed $TESTING_ROOT"
+                fi
+            fi
             log_with_timestamp "Cleanup complete"
             ;;
         *)
-            log_with_timestamp "Usage: $0 [build | test | clean]"
+            log_with_timestamp "Usage: $0 [debug | release | clean]"
             exit 1
             ;;
     esac

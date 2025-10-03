@@ -8,25 +8,21 @@ use tokio::sync::mpsc;
 use tokio::time::interval;
 
 pub async fn run_light_timer(
-    relay_id: String,
+    _relay_id: String,
     on_hours: u64,
     off_hours: u64,
     tx: mpsc::Sender<Command>,
 ) {
     info!(
-        "Starting light timer for relay {} with {}h ON / {}h OFF cycle",
-        relay_id, on_hours, off_hours
+        "Starting light timer with {}h ON / {}h OFF cycle",
+        on_hours, off_hours
     );
     let mut interval = interval(tokio::time::Duration::from_secs(15));
     let mut is_on = true;
 
     loop {
         interval.tick().await;
-        let cmd = if is_on {
-            Command::TurnOnSolar(relay_id.clone())
-        } else {
-            Command::TurnOffSolar(relay_id.clone())
-        };
+        let cmd = if is_on { Command::TurnOnSolar } else { Command::TurnOffSolar };
         if tx.send(cmd).await.is_err() {
             break;
         }

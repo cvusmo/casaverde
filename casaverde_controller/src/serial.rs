@@ -27,21 +27,21 @@ pub fn send_command(
     port: &mut dyn serialport::SerialPort,
     cmd: &Command,
 ) -> Result<(), serialport::Error> {
-    let (command, msg) = match cmd {
-        Command::TurnOnCooling(id) => (format!("SET {id} ON\n"), "turn ON"),
-        Command::TurnOffCooling(id) => (format!("SET {id} OFF\n"), "turn OFF"),
-        Command::TurnOnMoisture(id) => (format!("SET {id} ON\n"), "TurnOnMoisture"),
-        Command::TurnOffMoisture(id) => (format!("SET {id} OFF\n"), "TurnOffMoisture"),
-        Command::OpenValve(id) => (format!("SET {id} ON\n"), "OpenValve"),
-        Command::CloseValve(id) => (format!("SET {id} OFF\n"), "CloseValve"),
-        Command::TurnOnSolar(id) => (format!("SET {id} ON\n"), "TurnOnSolar"),
-        Command::TurnOffSolar(id) => (format!("SET {id} OFF\n"), "TurnOffSolar"),
-        Command::TurnOnHumidity(id) => (format!("SET {id} ON\n"), "TurnOnHumidity"),
-        Command::TurnOffHumidity(id) => (format!("SET {id} OFF\n"), "TurnOffHumidity"),
-        Command::SetPWM(id, pwm) => (format!("PWM_{id}_{pwm}\n"), "SetPWM"),
+    let command = match cmd {
+        Command::TurnOnCooling => "SET FAN1 ON\n",
+        Command::TurnOffCooling => "SET FAN1 OFF\n",
+        Command::TurnOnMoisture => "GET moisture-1\n",
+        Command::TurnOffMoisture => "GET moisture-1\n",
+        Command::OpenValve => "GET water-1\n",
+        Command::CloseValve => "GET water-1\n",
+        Command::TurnOnSolar => "GET solar-1\n",
+        Command::TurnOffSolar => "GET solar-1\n",
+        Command::TurnOnHumidity => "GET humidity-1\n",
+        Command::TurnOffHumidity => "GET humidity-1\n",
+        Command::SetPWM(pwm) => &format!("SET FAN1 PWM_{pwm}\n"),
     };
     port.write_all(command.as_bytes())?;
-    info!("Sent command {msg} on relay {}", cmd.id());
+    info!("Sent command on device {}", cmd.id());
     Ok(())
 }
 
@@ -88,7 +88,12 @@ fn match_response(response: &str, readings: &mut Vec<DeviceReading>) {
     if response.starts_with("RELAY:") {
         readings.push(DeviceReading {
             id: "relay-1".to_string(),
-            value: Some(if response == "RELAY:OK" { 1.0 } else { 0.0 }),
+            value: Some(if response == "RELAY:ON" { 1.0 } else { 0.0 }),
+        });
+    } else if response.starts_with("FAN:") {
+        readings.push(DeviceReading {
+            id: "FAN1".to_string(),
+            value: Some(if response == "FAN:ON" { 1.0 } else { 0.0 }),
         });
     }
 }

@@ -2,8 +2,6 @@
 // github.com/cvusmo/casaverde/casaverde_controller
 // src/client.rs - HTTP client setup and data fetching
 
-// TODO: RENAME TO COMMANDS.RS
-
 use crate::config;
 use crate::config::Config;
 use crate::controller::Command;
@@ -69,67 +67,64 @@ pub async fn fetch_config(client: &Client, server: &str, controller_id: &str) ->
     })
 }
 
+pub async fn simulation_commands(client: &Client, server: &str, is_simulation: bool) -> Result<(), Box<dyn std::error::Error>> {
+    if is_simulation {
+        let commands = vec![
+            CommandData { action: "GET".to_string(), device_id: "blackbeard-cpu".to_string() },
+            CommandData { action: "GET".to_string(), device_id: "solar-1".to_string() },
+            CommandData { action: "GET".to_string(), device_id: "moisture-1".to_string() },
+            CommandData { action: "GET".to_string(), device_id: "humidity-1".to_string() },
+            CommandData { action: "GET".to_string(), device_id: "water-1".to_string() },
+            CommandData { action: "GET".to_string(), device_id: "relay-1".to_string() },
+        ];
+        let payload = CommandPayload {
+            controller_id: config::get_hostname(),
+            commands,
+        };
+        let url = format!("{server}/commands");
+        let resp = client.post(&url).json(&payload).send().await?;
+        if resp.status().is_success() {
+            info!("Successfully sent simulation commands to {url}: {:?}", payload);
+            Ok(())
+        } else {
+            let status = resp.status();
+            let text = resp.text().await.unwrap_or_default();
+            error!("Failed to send simulation commands to {url}: status {status}, response {text}");
+            Err(format!("Failed to send commands: status {status}").into())
+        }
+    } else {
+        Ok(())
+    }
+}
+
 pub async fn send_commands(client: &Client, server: &str, commands: &[Command]) -> Result<(), Box<dyn std::error::Error>> {
     let url = format!("{server}/commands");
     let payload = CommandPayload {
         controller_id: config::get_hostname(),
         commands: commands.iter().map(|cmd| match cmd {
-            Command::TurnOnCooling(id) => CommandData {
-                action: "TurnOnCooling".to_string(),
-                device_id: id.clone(),
-            },
-            Command::TurnOffCooling(id) => CommandData {
-                action: "TurnOffCooling".to_string(),
-                device_id: id.clone(),
-            },
-            Command::TurnOnMoisture(id) => CommandData {
-                action: "TurnOnMoisture".to_string(),
-                device_id: id.clone(),
-            },
-            Command::TurnOffMoisture(id) => CommandData {
-                action: "TurnOffMoisture".to_string(),
-                device_id: id.clone(),
-            },
-            Command::OpenValve(id) => CommandData {
-                action: "OpenValve".to_string(),
-                device_id: id.clone(),
-            },
-            Command::CloseValve(id) => CommandData {
-                action: "CloseValve".to_string(),
-                device_id: id.clone(),
-            },
-            Command::TurnOnSolar(id) => CommandData {
-                action: "TurnOnLight".to_string(),
-                device_id: id.clone(),
-            },
-            Command::TurnOffSolar(id) => CommandData {
-                action: "TurnOffLight".to_string(),
-                device_id: id.clone(),
-            },
-            Command::TurnOnHumidity(id) => CommandData {
-                action: "TurnOnHumidity".to_string(),
-                device_id: id.clone(),
-            },
-            Command::TurnOffHumidity(id) => CommandData {
-                action: "TurnOffHumidity".to_string(),
-                device_id: id.clone(),
-            },
-            Command::SetPWM(id, pwm) => CommandData {
-                action: "SetPWM".to_string(),
-                device_id: format!("{}_{}", id, pwm),
-            },
+            Command::TurnOnCooling => CommandData { action: "ON".to_string(), device_id: "FAN1".to_string() },
+            Command::TurnOffCooling => CommandData { action: "OFF".to_string(), device_id: "FAN1".to_string() },
+            Command::TurnOnMoisture => CommandData { action: "ON".to_string(), device_id: "moisture-1".to_string() },
+            Command::TurnOffMoisture => CommandData { action: "OFF".to_string(), device_id: "moisture-1".to_string() },
+            Command::OpenValve => CommandData { action: "OPEN".to_string(), device_id: "water-1".to_string() },
+            Command::CloseValve => CommandData { action: "CLOSE".to_string(), device_id: "water-1".to_string() },
+            Command::TurnOnSolar => CommandData { action: "ON".to_string(), device_id: "solar-1".to_string() },
+            Command::TurnOffSolar => CommandData { action: "OFF".to_string(), device_id: "solar-1".to_string() },
+            Command::TurnOnHumidity => CommandData { action: "ON".to_string(), device_id: "humidity-1".to_string() },
+            Command::TurnOffHumidity => CommandData { action: "OFF".to_string(), device_id: "humidity-1".to_string() },
+            Command::SetPWM(pwm) => CommandData { action: "SET".to_string(), device_id: format!("FAN1_{pwm}") },
         }).collect(),
     };
 
     let resp = client.post(&url).json(&payload).send().await?;
     if resp.status().is_success() {
         info!("Successfully sent commands to {url}: {:?}", payload);
-        Ok(())
+        return Ok(());
     } else {
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
         error!("Failed to send commands to {url}: status {status}, response {text}");
-        Err(format!("Failed to send commands: status {status}").into())
+        return Err(format!("Failed to send commands: status {status}").into());
     }
 }
 

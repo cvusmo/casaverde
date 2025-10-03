@@ -18,7 +18,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Starting casaverde_controller on {}", config::get_hostname());
 
     let mut config = config::load_config()?;
-    let client = client::build_secure_client()?; // Placeholder; consider hyper
+    let client = client::build_secure_client()?;
     let port: Arc<tokio::sync::Mutex<Box<dyn serialport::SerialPort>>> = Arc::new(tokio::sync::Mutex::new(init_serial(&config)?));
 
     if let Ok(server_config) = client::fetch_config(&client, &config.server, &config.controller_id).await {
@@ -32,17 +32,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (cmd_tx, mut cmd_rx) = mpsc::channel::<Command>(100);
 
     {
-        let light_id = config.light_relay_id.clone();
         let on_hours = config.light_on_hours;
         let off_hours = config.light_off_hours;
         let tx = cmd_tx.clone();
-        spawn(run_light_timer(light_id, on_hours, off_hours, tx));
+        spawn(run_light_timer(String::new(), on_hours, off_hours, tx));
     }
 
     {
         let port = port.clone();
         let client = client.clone();
         let server = config.server.clone();
+        let is_simulation = std::env::var("SIMULATION_MODE")
+            .map(|v| v == "1")
+            .unwrap_or(false); // Default to false (production mode)
         spawn(async move {
             while let Some(cmd) = cmd_rx.recv().await {
                 info!("Executing command via serial: {:?}", cmd);
@@ -50,9 +52,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     error!("send_commands to server error: {}", e);
                 }
                 let mut guard = port.lock().await;
-                let port_ref: &mut dyn serialport::SerialPort = &mut **guard; // Explicit dereference
+                let port_ref: &mut dyn serialport::SerialPort = &mut **guard;
                 if let Err(e) = send_command(port_ref, &cmd) {
                     error!("Error sending command via serial: {}", e);
+                }
+                // Query all sensors in simulation mode
+                if is_simulation {
+                    if let Err(e) = client::simulation_commands(&client, &server, is_simulation).await {
+                        error!("Simulation command error: {}", e);
+                    }
                 }
             }
         });
@@ -62,7 +70,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         interval.tick().await;
         let mut guard = port.lock().await;
-        let port_ref: &mut dyn serialport::SerialPort = &mut **guard; // Explicit dereference
+        let port_ref: &mut dyn serialport::SerialPort = &mut **guard;
         let sensor_data = read_sensor_data(port_ref);
         drop(guard);
 
