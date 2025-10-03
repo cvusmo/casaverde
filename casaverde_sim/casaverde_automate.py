@@ -1,4 +1,5 @@
 # python casaverde_automate.py --testing-root ~/casaverde_test
+# python /home/echo/projects/remote/casaverde/casaverde_sim/casaverde_automate.py --testing-root ~/casaverde_test
 
 import argparse
 import logging
@@ -10,14 +11,21 @@ import subprocess
 import sys
 import time
 
-# Set up logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
+
+# Set up logging to file
+def setup_logging(testing_root, log_level=logging.INFO):
+    log_file = os.path.join(testing_root, "casaverde_automate.log")
+    logging.basicConfig(
+        level=log_level,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        handlers=[logging.FileHandler(log_file)],
+    )
+    logger = logging.getLogger(__name__)
+    return logger
 
 
 def check_path_exists(path, is_file=False):
+    """Check if a path exists and matches the expected type."""
     if (is_file and not os.path.isfile(path)) or (
         not is_file and not os.path.isdir(path)
     ):
@@ -25,6 +33,7 @@ def check_path_exists(path, is_file=False):
 
 
 def is_port_open(host, port):
+    """Check if a port is open on the given host."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(1)
     result = sock.connect_ex((host, port))
@@ -33,13 +42,14 @@ def is_port_open(host, port):
 
 
 def main(args):
+    """Main function to automate Casaverde testing setup and execution."""
     # Define paths with overrides from args/env
     home = os.path.expanduser("~")
     project_root = args.project_root or os.getenv(
         "PROJECT_ROOT", os.path.join(home, "projects", "remote", "casaverde")
     )
     testing_root = args.testing_root or os.getenv(
-        "TESTING_ROOT", os.path.join(home, "casaverde_testing")
+        "TESTING_ROOT", os.path.join(home, "casaverde_test")
     )
     venv_python = args.venv_python or os.getenv(
         "VENV_PYTHON",
@@ -52,6 +62,9 @@ def main(args):
         "CONFIG_DIR", os.path.join(home, ".config", "casaverde_server")
     )
 
+    # Setup logging
+    logger = setup_logging(testing_root, getattr(logging, args.log_level.upper()))
+
     # Validate key paths
     try:
         check_path_exists(project_root)
@@ -59,6 +72,7 @@ def main(args):
         check_path_exists(sim_script, is_file=True)
     except FileNotFoundError as e:
         logger.error(e)
+        print(f"Error: {e}")
         sys.exit(1)
 
     # Clean testing root if requested
@@ -66,77 +80,41 @@ def main(args):
         if os.path.exists(testing_root):
             shutil.rmtree(testing_root)
         logger.info("Cleaned testing root.")
+        print("Cleaned testing root.")
 
     # Create testing directories
     os.makedirs(testing_root, exist_ok=True)
     app_dir = os.path.join(testing_root, "casaverde_app")
     controller_dir = os.path.join(testing_root, "casaverde_controller")
     server_dir = os.path.join(testing_root, "casaverde_server")
-    os.makedirs(app_dir, exist_ok=True)
-    os.makedirs(controller_dir, exist_ok=True)
-    os.makedirs(server_dir, exist_ok=True)
+    for dir_path in [app_dir, controller_dir, server_dir]:
+        os.makedirs(dir_path, exist_ok=True)
 
-    # Step 3: Build the projects with cargo
-    for proj in ["casaverde_app", "casaverde_controller", "casaverde_server"]:
-        try:
-            logger.info(f"Building {proj}...")
-            subprocess.check_call(
-                ["cargo", "build", "--release"], cwd=os.path.join(project_root, proj)
-            )
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Build failed for {proj}: {e}")
-            sys.exit(1)
-
-    # Copy binaries to testing dirs
+    # Copy binaries from workspace root
     try:
-        shutil.copy(
-            os.path.join(
-                project_root, "casaverde_app", "target", "release", "casaverde_app"
-            ),
-            app_dir,
-        )
-        shutil.copy(
-            os.path.join(
-                project_root,
-                "casaverde_controller",
-                "target",
-                "release",
-                "casaverde_controller",
-            ),
-            controller_dir,
-        )
-        shutil.copy(
-            os.path.join(
-                project_root,
-                "casaverde_server",
-                "target",
-                "release",
-                "casaverde_server",
-            ),
-            server_dir,
-        )
+        print("Copying binaries...", end=" ")
+        for bin_name, dest in [
+            ("casaverde_app", app_dir),
+            ("casaverde_controller", controller_dir),
+            ("casaverde_server", server_dir),
+        ]:
+            src = os.path.join(project_root, "target", "release", bin_name)
+            shutil.copy(src, dest)
+        logger.info("Binaries copied successfully.")
+        print("Done.")
     except FileNotFoundError as e:
         logger.error(f"Binary copy failed: {e}")
+        print("Failed.")
         sys.exit(1)
 
-    # Step 4: Run setup.sh for certificates
-    setup_script = os.path.join(project_root, "casaverde_server", "setup.sh")
+    # Copy and configure necessary files
     try:
-        check_path_exists(setup_script, is_file=True)
-        logger.info("Running setup.sh...")
-        subprocess.check_call(["bash", setup_script])
-    except (FileNotFoundError, subprocess.CalledProcessError) as e:
-        logger.error(f"setup.sh failed: {e}")
-        sys.exit(1)
-
-    # Step 6: Copy necessary files
-    try:
+        print("Copying config files and certificates...", end=" ")
         shutil.copy(os.path.join(project_root, "casaverde_app", "config.toml"), app_dir)
         shutil.copy(
             os.path.join(project_root, "casaverde_controller", "config.toml"),
             controller_dir,
         )
-        # Update config.toml to use local server URL
         for dir_path in [app_dir, controller_dir]:
             config_path = os.path.join(dir_path, "config.toml")
             with open(config_path, "r+") as f:
@@ -145,14 +123,16 @@ def main(args):
                 f.seek(0)
                 f.write(text)
                 f.truncate()
-        # Copy server.crt
         shutil.copy(os.path.join(config_dir, "server.crt"), app_dir)
         shutil.copy(os.path.join(config_dir, "server.crt"), controller_dir)
+        logger.info("Config files and certificates copied successfully.")
+        print("Done.")
     except FileNotFoundError as e:
         logger.error(f"File copy failed: {e}")
+        print("Failed.")
         sys.exit(1)
 
-    # Step 7: Start processes
+    # Start processes
     processes = []
 
     # Check if port is free
@@ -160,11 +140,12 @@ def main(args):
         logger.error(
             "Port 3003 is already in use. Stop the existing process and retry."
         )
+        print("Error: Port 3003 is already in use.")
         sys.exit(1)
 
-    # Start socat (step 1)
+    # Start socat
     try:
-        logger.info("Starting socat...")
+        print("Starting socat...", end=" ")
         socat_cmd = [
             "socat",
             "-d",
@@ -172,58 +153,96 @@ def main(args):
             "pty,raw,echo=0,link=/tmp/virtualcom0",
             "pty,raw,echo=0,link=/tmp/virtualcom1",
         ]
-        socat_p = subprocess.Popen(socat_cmd)
+        with open(os.path.join(testing_root, "socat.log"), "w") as log_file:
+            socat_p = subprocess.Popen(
+                socat_cmd, stdout=log_file, stderr=subprocess.STDOUT
+            )
         processes.append(socat_p)
-        time.sleep(2)  # Give time to initialize
+        time.sleep(2)
+        logger.info("socat started.")
+        print("Done.")
     except FileNotFoundError:
         logger.error("socat not found. Install it and retry.")
+        print("Error: socat not found.")
         sys.exit(1)
 
-    # Start simulator in venv (step 2)
-    logger.info("Starting simulator...")
-    sim_p = subprocess.Popen([venv_python, sim_script])
+    # Start simulator
+    print("Starting simulator...", end=" ")
+    with open(os.path.join(testing_root, "casaverde_sim.log"), "w") as sim_log:
+        sim_p = subprocess.Popen(
+            [venv_python, sim_script], stdout=sim_log, stderr=subprocess.STDOUT
+        )
     processes.append(sim_p)
     time.sleep(1)
+    logger.info("Simulator started.")
+    print("Done.")
 
-    # Start server with local IP
-    logger.info("Starting casaverde_server...")
+    # Start server
+    print("Starting casaverde_server...", end=" ")
     server_bin = os.path.join(server_dir, "casaverde_server")
     env = os.environ.copy()
     env["SERVER_IP"] = "127.0.0.1:3003"
-    server_p = subprocess.Popen([server_bin], cwd=server_dir, env=env)
+    with open(os.path.join(server_dir, "casaverde_server.log"), "w") as server_log:
+        server_p = subprocess.Popen(
+            [server_bin],
+            cwd=server_dir,
+            env=env,
+            stdout=server_log,
+            stderr=subprocess.STDOUT,
+        )
     processes.append(server_p)
-    # Poll for server readiness
     start_time = time.time()
     while not is_port_open("127.0.0.1", 3003):
         if time.time() - start_time > 10:
             logger.error("Server failed to start on port 3003.")
+            print("Failed.")
             sys.exit(1)
         time.sleep(1)
+    logger.info("casaverde_server started.")
+    print("Done.")
 
     # Start controller
-    logger.info("Starting casaverde_controller...")
+    print("Starting casaverde_controller...", end=" ")
     controller_bin = os.path.join(controller_dir, "casaverde_controller")
-    controller_p = subprocess.Popen([controller_bin], cwd=controller_dir)
+    with open(
+        os.path.join(controller_dir, "casaverde_controller.log"), "w"
+    ) as controller_log:
+        controller_p = subprocess.Popen(
+            [controller_bin],
+            cwd=controller_dir,
+            stdout=controller_log,
+            stderr=subprocess.STDOUT,
+        )
     processes.append(controller_p)
     time.sleep(2)
+    logger.info("casaverde_controller started.")
+    print("Done.")
 
-    # Start app with --tui
-    logger.info("Starting casaverde_app with --tui...")
+    # Start app
+    print("Starting casaverde_app with --tui...", end=" ")
     app_bin = os.path.join(app_dir, "casaverde_app")
-    app_p = subprocess.Popen([app_bin, "--tui"], cwd=app_dir)
+    with open(os.path.join(app_dir, "casaverde_app.log"), "w") as app_log:
+        app_p = subprocess.Popen(
+            [app_bin, "--tui"], cwd=app_dir, stdout=app_log, stderr=subprocess.STDOUT
+        )
     processes.append(app_p)
+    logger.info("casaverde_app started.")
+    print("Done.")
 
-    logger.info("All components started. Press Ctrl+C to stop.")
+    print(
+        "\nAll components started successfully. Press Ctrl+C to stop.\nLogs are in the testing root directories."
+    )
 
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        logger.info("Stopping all processes...")
+        print("Stopping all processes...")
         for p in processes:
             p.send_signal(signal.SIGINT)
-            p.wait(timeout=5)  # Give time to shutdown
+            p.wait(timeout=5)
         logger.info("Cleanup complete.")
+        print("Cleanup complete. Check logs for details.")
 
 
 if __name__ == "__main__":
@@ -237,6 +256,9 @@ if __name__ == "__main__":
     parser.add_argument("--config-dir", help="Override CONFIG_DIR path")
     parser.add_argument(
         "--clean", action="store_true", help="Clean testing root before starting"
+    )
+    parser.add_argument(
+        "--log-level", default="INFO", help="Set log level (DEBUG, INFO, etc.)"
     )
     args = parser.parse_args()
     main(args)
