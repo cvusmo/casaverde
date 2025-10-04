@@ -1,4 +1,4 @@
-### `casaverde_automate.py.md`
+### `casavverde_automate_debug.py`
 
 #!/usr/bin/env python3
 import argparse
@@ -50,7 +50,7 @@ def main(args):
         os.path.join(project_root, "casaverde_sim", "venv", "bin", "python"),
     )
     sim_script = args.sim_script or os.getenv(
-        "SIM_SCRIPT", os.path.join(project_root, "casaverde_sim", "casaverde_sim_1.py")
+        "SIM_SCRIPT", os.path.join(project_root, "casaverde_sim", "casaverde_sim_2.py")
     )
     config_dir = args.config_dir or os.getenv(
         "CONFIG_DIR", os.path.join(home, ".config", "casaverde_server")
@@ -147,37 +147,38 @@ def main(args):
         print("Error: Port 3003 is already in use on 10.0.0.6.")
         sys.exit(1)
 
-    try:
-        print("Starting socat...", end=" ")
-        socat_cmd = [
-            "socat",
-            "-d",
-            "-d",
-            "pty,raw,echo=0,link=/tmp/virtualcom0",
-            "pty,raw,echo=0,link=/tmp/virtualcom1",
-        ]
-        with open(os.path.join(testing_root, "socat.log"), "w") as log_file:
-            socat_p = subprocess.Popen(
-                socat_cmd, stdout=log_file, stderr=subprocess.STDOUT
-            )
-        processes.append(socat_p)
-        time.sleep(2)
-        logger.info("socat started.")
-        print("Done.")
-    except FileNotFoundError:
-        logger.error("socat not found. Install it and retry.")
-        print("Error: socat not found.")
-        sys.exit(1)
+    # UNCOMMENT FOR SIMULATION
+    # try:
+    #     print("Starting socat...", end=" ")
+    #     socat_cmd = [
+    #         "socat",
+    #         "-d",
+    #         "-d",
+    #         "pty,raw,echo=0,link=/tmp/virtualcom0",
+    #         "pty,raw,echo=0,link=/tmp/virtualcom1",
+    #     ]
+    #     with open(os.path.join(testing_root, "socat.log"), "w") as log_file:
+    #         socat_p = subprocess.Popen(
+    #             socat_cmd, stdout=log_file, stderr=subprocess.STDOUT
+    #         )
+    #     processes.append(socat_p)
+    #     time.sleep(2)
+    #     logger.info("socat started.")
+    #     print("Done.")
+    # except FileNotFoundError:
+    #     logger.error("socat not found. Install it and retry.")
+    #     print("Error: socat not found.")
+    #     sys.exit(1)
 
-    print("Starting simulator...", end=" ")
-    with open(os.path.join(testing_root, "casaverde_sim.log"), "w") as sim_log:
-        sim_p = subprocess.Popen(
-            [venv_python, sim_script], stdout=sim_log, stderr=subprocess.STDOUT
-        )
-    processes.append(sim_p)
-    time.sleep(1)
-    logger.info("Simulator started.")
-    print("Done.")
+    # print("Starting simulator...", end=" ")
+    # with open(os.path.join(testing_root, "casaverde_sim.log"), "w") as sim_log:
+    #     sim_p = subprocess.Popen(
+    #         [venv_python, sim_script], stdout=sim_log, stderr=subprocess.STDOUT
+    #     )
+    # processes.append(sim_p)
+    # time.sleep(1)
+    # logger.info("Simulator started.")
+    # print("Done.")
 
     print("Starting casaverde_server...", end=" ")
     server_bin = os.path.join(server_dir, "casaverde_server")

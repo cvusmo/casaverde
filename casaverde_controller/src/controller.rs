@@ -19,6 +19,9 @@ pub enum Command {
     TurnOnHumidity,
     TurnOffHumidity,
     SetPWM(u8),
+    GetProbeTemp,
+    TurnOnRelay2,
+    TurnOffRelay2,
 }
 
 impl Command {
@@ -30,6 +33,8 @@ impl Command {
             Command::TurnOnSolar | Command::TurnOffSolar => "solar-1",
             Command::TurnOnHumidity | Command::TurnOffHumidity => "humidity-1",
             Command::SetPWM(_) => "FAN1",
+            Command::GetProbeTemp => "blackbeard-probe",
+            Command::TurnOnRelay2 | Command::TurnOffRelay2 => "relay-2",
         }
     }
 }
@@ -57,6 +62,8 @@ pub fn process_remote_readings(readings: &Value, controller_id: &str) -> Vec<Com
                                                 let value = obj.get("value")?.as_f64()?;
                                                 match id {
                                                     "blackbeard-cpu" if value > 40.0 => Some(Command::TurnOnCooling),
+                                                    "blackbeard-probe" if value > 15.0 => Some(Command::TurnOnRelay2),
+                                                    "blackbeard-probe" if value <= 15.0 => Some(Command::TurnOffRelay2),
                                                     _ => None,
                                                 }
                                             })
@@ -78,6 +85,7 @@ pub fn process_local_rules(_config: &crate::config::Config, local_temp: f64) -> 
         commands.push(Command::TurnOnCooling);
     }
     // Periodic queries for all sensors
+    commands.push(Command::GetProbeTemp);
     commands.push(Command::TurnOnMoisture);
     commands.push(Command::OpenValve);
     commands.push(Command::TurnOnSolar);

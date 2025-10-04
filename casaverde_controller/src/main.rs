@@ -86,12 +86,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let local_temp = gpio::read_temperature();
         info!("Local temperature reading: {:?}", local_temp);
 
+        let probe_temp = sensor_data.as_ref().and_then(|data| {
+            data.iter().find(|d| d.id == "blackbeard-probe").and_then(|d| d.value)
+        });
+
         let remote_commands = process_remote_readings(&readings, &config.controller_id);
         let local_commands = process_local_rules(&config, local_temp.unwrap_or_default().into());
 
         let mut commands = Vec::new();
         commands.extend(remote_commands);
         commands.extend(local_commands);
+
+        if let Some(pt) = probe_temp {
+            info!("Probe temperature: {}", pt);
+            if pt > 15.0 {
+                commands.push(Command::TurnOnRelay2);
+            } else {
+                commands.push(Command::TurnOffRelay2);
+            }
+        }
 
         for cmd in &commands {
             if let Err(e) = cmd_tx.send(cmd.clone()).await {

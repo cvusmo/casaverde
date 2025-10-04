@@ -4,7 +4,7 @@
 
 use crate::controller::Command;
 use crate::models::DeviceReading;
-use log::info;
+use log::{error, info};
 use serialport;
 
 pub fn init_serial(
@@ -14,13 +14,19 @@ pub fn init_serial(
         log::error!("Serial port not configured in config.toml");
         serialport::Error::new(serialport::ErrorKind::NoDevice, "Serial port not found")
     })?;
-    serialport::new(port_name, 9600)
+    let port = serialport::new(port_name, 9600)
         .timeout(std::time::Duration::from_millis(1000))
-        .open()
-        .map(|port| {
-            info!("Serial port {port_name} initialized at 9600 baud");
-            port
-        })
+        .open();
+    match port {
+        Ok(p) => {
+            info!("Serial port {} initialized at 9600 baud", port_name);
+            Ok(p)
+        }
+        Err(e) => {
+            error!("Failed to open serial port {}: {:?}", port_name, e);
+            Err(e)
+        }
+    }
 }
 
 pub fn send_command(
@@ -39,6 +45,10 @@ pub fn send_command(
         Command::TurnOnHumidity => "GET humidity-1\n",
         Command::TurnOffHumidity => "GET humidity-1\n",
         Command::SetPWM(pwm) => &format!("SET FAN1 PWM_{pwm}\n"),
+
+        Command::GetProbeTemp => "GET blackbeard-probe\n",
+        Command::TurnOnRelay2 => "ON_INT2\n",
+        Command::TurnOffRelay2 => "OFF_INT2\n",
     };
     port.write_all(command.as_bytes())?;
     info!("Sent command on device {}", cmd.id());
@@ -81,6 +91,7 @@ fn match_response(response: &str, readings: &mut Vec<DeviceReading>) {
     }
 
     match_sensor!("TEMP:", "blackbeard-cpu", readings);
+    match_sensor!("TEMP_PROBE:", "blackbeard-probe", readings);
     match_sensor!("SOLAR:", "solar-1", readings);
     match_sensor!("MOISTURE:", "moisture-1", readings);
     match_sensor!("HUMIDITY:", "humidity-1", readings);

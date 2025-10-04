@@ -44,3 +44,10 @@ type = "relay"
 endpoint = "/relay_control"
 serial_port = ""
 interval = 15
+
+[[configs]]
+id = "blackbeard-probe"
+type = "temperature"
+endpoint = "/sensor_data"
+serial_port = ""
+interval = 15

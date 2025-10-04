@@ -76,6 +76,8 @@ pub async fn simulation_commands(client: &Client, server: &str, is_simulation: b
             CommandData { action: "GET".to_string(), device_id: "humidity-1".to_string() },
             CommandData { action: "GET".to_string(), device_id: "water-1".to_string() },
             CommandData { action: "GET".to_string(), device_id: "relay-1".to_string() },
+
+            CommandData { action: "GET".to_string(), device_id: "blackbeard-probe".to_string() },
         ];
         let payload = CommandPayload {
             controller_id: config::get_hostname(),
@@ -113,6 +115,10 @@ pub async fn send_commands(client: &Client, server: &str, commands: &[Command]) 
             Command::TurnOnHumidity => CommandData { action: "ON".to_string(), device_id: "humidity-1".to_string() },
             Command::TurnOffHumidity => CommandData { action: "OFF".to_string(), device_id: "humidity-1".to_string() },
             Command::SetPWM(pwm) => CommandData { action: "SET".to_string(), device_id: format!("FAN1_{pwm}") },
+
+            Command::GetProbeTemp => CommandData { action: "GET".to_string(), device_id: "blackbeard-probe".to_string() },
+            Command::TurnOnRelay2 => CommandData { action: "ON".to_string(), device_id: "relay-2".to_string() },
+            Command::TurnOffRelay2 => CommandData { action: "OFF".to_string(), device_id: "relay-2".to_string() },
         }).collect(),
     };
 

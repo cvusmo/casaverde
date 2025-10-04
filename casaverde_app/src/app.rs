@@ -62,6 +62,7 @@ impl CasaverdeApp {
                 "moisture-1" => Sensor::Moisture,
                 "humidity-1" => Sensor::Humidity,
                 "water-1" => Sensor::Water,
+                "blackbeard-probe" => Sensor::Probe,
                 _ => return,
             };
             self.sensor_data.toggle_sensor(sensor);

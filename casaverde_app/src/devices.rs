@@ -15,15 +15,17 @@ pub enum Sensor {
     Moisture,
     Humidity,
     Water,
+    Probe,
 }
 
 impl Sensor {
-    pub const ALL: [Sensor; 5] = [
+    pub const ALL: [Sensor; 6] = [
         Sensor::Solar,
         Sensor::Temperature,
         Sensor::Moisture,
         Sensor::Humidity,
         Sensor::Water,
+        Sensor::Probe,
     ];
 
     pub fn name(self) -> &'static str {
@@ -33,6 +35,8 @@ impl Sensor {
             Sensor::Moisture => "Moisture Sensor",
             Sensor::Humidity => "Humidity Sensor",
             Sensor::Water => "Water Sensor",
+
+            Sensor::Probe => "Probe Temperature",
         }
     }
 
@@ -43,6 +47,8 @@ impl Sensor {
             Sensor::Moisture => "moisture-1",
             Sensor::Humidity => "humidity-1",
             Sensor::Water => "water-1",
+
+            Sensor::Probe => "blackbeard-probe",
         }
     }
 }
@@ -65,6 +71,7 @@ pub struct DeviceConfigRoot {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct TempData {
     pub cpu: Option<f32>,
+    pub probe: Option<f32>,
 }
 
 #[derive(Serialize)]
@@ -135,7 +142,7 @@ impl DeviceData {
         info!("DeviceData initialized with {device_count} devices");
         Self {
             states,
-            temp_data: TempData { cpu: None },
+            temp_data: TempData { cpu: None, probe: None },
             device_values,
             client,
             config,
@@ -158,6 +165,7 @@ impl DeviceData {
                             "moisture-1" => Some(Sensor::Moisture),
                             "humidity-1" => Some(Sensor::Humidity),
                             "water-1" => Some(Sensor::Water),
+                            "blackbeard-probe" => Some(Sensor::Probe),
                             _ => None,
                         };
 
@@ -174,6 +182,9 @@ impl DeviceData {
                                 if config.id == "blackbeard-cpu" {
                                     self.temp_data.cpu = value;
                                 }
+                                if config.id == "blackbeard-probe" {
+                                    self.temp_data.probe = value;
+                                }
                                 devices.push(DeviceReading {
                                     id: config.id.clone(),
                                     value,
@@ -182,6 +193,9 @@ impl DeviceData {
                                 self.device_values[i] = None;
                                 if config.id == "blackbeard-cpu" {
                                     self.temp_data.cpu = None;
+                                }
+                                if config.id == "blackbeard-probe" {
+                                    self.temp_data.probe = None;
                                 }
                             }
                         } else if config.id == "relay-1" {

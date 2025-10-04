@@ -43,6 +43,7 @@ pub fn render_tui(
                         "moisture-1" => Some(Sensor::Moisture),
                         "humidity-1" => Some(Sensor::Humidity),
                         "water-1" => Some(Sensor::Water),
+                        "blackbeard-probe" => Some(Sensor::Probe),
                         _ => None,
                     };
 
@@ -58,6 +59,7 @@ pub fn render_tui(
                         (Some(Sensor::Moisture), Some(v)) => format!("{v:.1}%"),
                         (Some(Sensor::Humidity), Some(v)) => format!("{v:.1}%"),
                         (Some(Sensor::Water), Some(v)) => format!("{v:.1}%"),
+                        (Some(Sensor::Probe), Some(v)) => format!("{v:.1}°C"),
                         (Some(_), None) => "N/A".to_string(),
                         (None, Some(v)) if id == "relay-1" => format!("{v:.1}"),
                         _ => "N/A".to_string(),
@@ -101,6 +103,7 @@ pub fn render_tui(
                         "moisture-1" => Some(Sensor::Moisture),
                         "humidity-1" => Some(Sensor::Humidity),
                         "water-1" => Some(Sensor::Water),
+                        "blackbeard-probe" => Some(Sensor::Probe),
                         _ => None,
                     };
 
@@ -110,6 +113,7 @@ pub fn render_tui(
                         (Some(Sensor::Moisture), Some(v)) => format!("{v:.1}%"),
                         (Some(Sensor::Humidity), Some(v)) => format!("{v:.1}%"),
                         (Some(Sensor::Water), Some(v)) => format!("{v:.1}%"),
+                        (Some(Sensor::Probe), Some(v)) => format!("{v:.1}°C"),
                         (Some(_), None) => "N/A".to_string(),
                         (None, Some(v)) if id == "relay-1" => format!("{v:.1}"),
                         _ => "N/A".to_string(),

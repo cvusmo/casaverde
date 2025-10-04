@@ -1,4 +1,4 @@
-# casaverde_sim_1.py
+# casaverde_sim_2.py
 #!/usr/bin/env python3
 import serial
 import subprocess
@@ -14,6 +14,8 @@ water_valve_open = False
 solar_state = "ON"  # Default to ON for 18h cycle
 humidity = 70.0  # Starting humidity
 last_humidity_update = time.time()
+probe_temp = random.uniform(10.0, 20.0)  # Starting probe temp
+last_probe_update = time.time()
 last_water_flow = time.time()
 water_flow_times = [8, 16, 24]  # 8 AM, 4 PM, midnight (in 24h format)
 
@@ -46,6 +48,13 @@ while True:
                 )
             elif "solar-1" in received.lower():
                 response = f"SOLAR:{random.uniform(50.0, 150.0) if solar_state == 'ON' else 0.0:.1f}W\n"
+            elif "blackbeard-probe" in received.lower():
+                current_time = time.time()
+                if current_time - last_probe_update >= 60:
+                    probe_temp += random.uniform(-2.0, 2.0)
+                    probe_temp = max(5.0, min(25.0, probe_temp))
+                    last_probe_update = current_time
+                response = f"TEMP_PROBE:{probe_temp:.1f}\n"
             elif "moisture-1" in received.lower():
                 response = f"MOISTURE:{random.uniform(0.0, 100.0):.1f}%\n"
             elif "humidity-1" in received.lower():
