@@ -336,7 +336,7 @@ main() {
     case "$action" in
         "debug")
             log_with_timestamp "Starting debug build process for all components..."
-            for project in "casaverde_utils" "casaverde_server" "casaverde_app" "casaverde_controller"; do
+            for project in casaverde_server" "casaverde_app" "casaverde_controller"; do
                 build_project "$project" "debug"
             done
             for project in "casaverde_server" "casaverde_app" "casaverde_controller"; do
@@ -353,7 +353,7 @@ main() {
             ;;
         "release")
             log_with_timestamp "Starting release build process for all components..."
-            for project in "casaverde_utils" "casaverde_server" "casaverde_app" "casaverde_controller"; do
+            for project in "casaverde_server" "casaverde_app" "casaverde_controller"; do
                 build_project "$project" "release"
             done
             for project in "casaverde_server" "casaverde_app" "casaverde_controller"; do

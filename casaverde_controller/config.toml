@@ -1,9 +1,9 @@
 # Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 # config for casaverde_controller
 
-server = "https://10.0.0.6:3005"
+server = "https://127.0.0.1:3003"
 controller_id = "blackbeard-pi"
-serial_port = "/dev/ttyACM0"
+serial_port = ""
 light_relay_id = "relay-1"
 light_on_hours = 16
 light_off_hours = 8

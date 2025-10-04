@@ -27,7 +27,7 @@ Thumbs.db
 # Testing directories
 casaverde_test/
 casaverde_firmware/
-*.sh
+#*.sh
 
 # Certificate and key files
 *.crt 
