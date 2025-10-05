@@ -15,7 +15,7 @@ DEFAULT_PORT="3003"
 DEFAULT_SERIAL_PORT_REAL="/dev/ttyACM0"
 DEFAULT_SERIAL_PORT_SIM="/tmp/virtualcom0"
 
-# CUSTOM SETUP
+# CUSTOM SETUP (initialized with defaults)
 SERVER_IP="$DEFAULT_IP"
 APP_IP="$DEFAULT_IP"
 CONTROLLER_IP="$DEFAULT_IP"
@@ -30,13 +30,10 @@ CONTROLLER_PORT="$DEFAULT_PORT"
 SERIAL_PORT_REAL="$DEFAULT_SERIAL_PORT_REAL"
 SERIAL_PORT_SIM="$DEFAULT_SERIAL_PORT_SIM"
 
-# Define target platform for native Linux
+# Target platforms
 declare -A TARGETS
 TARGETS["linux"]="x86_64-unknown-linux-gnu"
-#TODO: add windows and others
-# TARGETS["windows"]="x86_64-pc-windows-gnu"
-# TARGETS["raspberry_pi_arm"]="armv7-unknown-linux-gnueabihf"
-# TARGETS["raspberry_pi_arm64"]="aarch64-unknown-linux-gnu"
+# TODO: add windows, raspberry pi, etc.
 
 mkdir -p "${BUILD_OUTPUT}/linux"
 mkdir -p "$LOG_DIR"
@@ -48,10 +45,10 @@ log_with_timestamp() {
 generate_certificates() {
   local cert_path="$CONFIG_DIR/server.crt"
   local key_path="$CONFIG_DIR/server.key"
-  local cn="$SERVER_IP"  # Use SERVER_IP for CN
+  local cn="$SERVER_HOSTNAME"  # Use hostname for CN
 
-  # Check if certificate exists and has correct CN
   if [[ -f "$cert_path" && -f "$key_path" ]]; then
+    local existing_cn
     existing_cn=$(openssl x509 -in "$cert_path" -noout -subject | grep -o 'CN\s*=\s*[^\s]*' | cut -d'=' -f2 | tr -d ' ')
     if [[ "$existing_cn" == "$cn" ]]; then
       log_with_timestamp "Existing certificate matches CN=$cn, reusing it."
@@ -60,7 +57,7 @@ generate_certificates() {
       cp "$cert_path" "$APP_CONFIG_DIR/server.crt" 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Failed copying cert"; exit 1; }
       return
     else
-      log_with_timestamp "Existing certificate has CN=$existing_cn, but need CN=$cn. Regenerating..."
+      log_with_timestamp "Existing certificate CN=$existing_cn, needs CN=$cn. Regenerating..."
     fi
   fi
 
@@ -69,7 +66,6 @@ generate_certificates() {
   chmod u+rwx "$CONFIG_DIR" 2>/dev/null || true
   openssl req -x509 -newkey rsa:4096 -keyout "$key_path" -out "$cert_path" \
     -sha256 -days 3650 -nodes -subj "/CN=$cn" 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Certificate generation failed"; exit 1; }
-  log_with_timestamp "Certificate generated at $cert_path"
   chmod +r "$cert_path" "$key_path" 2>/dev/null || true
   mkdir -p "$APP_CONFIG_DIR" && chmod u+rwx "$APP_CONFIG_DIR" 2>/dev/null || true
   cp "$cert_path" "$APP_CONFIG_DIR/server.crt" 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Failed copying cert"; exit 1; }
@@ -79,29 +75,37 @@ prompt_config() {
   echo "Use default settings? IP: $DEFAULT_IP, Hostname: $DEFAULT_HOSTNAME, Port: $DEFAULT_PORT, Real Serial: $DEFAULT_SERIAL_PORT_REAL, Sim Serial: $DEFAULT_SERIAL_PORT_SIM (y/n)"
   read -r use_defaults
   if [[ ! "$use_defaults" =~ ^[Yy]$ ]]; then
-    read -rp "Enter IP (default $DEFAULT_IP): " ip
-    ip=${ip:-$DEFAULT_IP}
-    read -rp "Enter Hostname (default $DEFAULT_HOSTNAME): " hostname
-    hostname=${hostname:-$DEFAULT_HOSTNAME}
-    read -rp "Enter Port (default $DEFAULT_PORT): " port
-    port=${port:-$DEFAULT_PORT}
+    read -rp "Enter Server IP (default $DEFAULT_IP): " SERVER_IP
+    SERVER_IP=${SERVER_IP:-$DEFAULT_IP}
+    read -rp "Enter Server Hostname (default $DEFAULT_HOSTNAME): " SERVER_HOSTNAME
+    SERVER_HOSTNAME=${SERVER_HOSTNAME:-$DEFAULT_HOSTNAME}
+    read -rp "Enter App IP (default $DEFAULT_IP): " APP_IP
+    APP_IP=${APP_IP:-$DEFAULT_IP}
+    read -rp "Enter App Hostname (default $DEFAULT_HOSTNAME): " APP_HOSTNAME
+    APP_HOSTNAME=${APP_HOSTNAME:-$DEFAULT_HOSTNAME}
+    read -rp "Enter Controller IP (default $DEFAULT_IP): " CONTROLLER_IP
+    CONTROLLER_IP=${CONTROLLER_IP:-$DEFAULT_IP}
+    read -rp "Enter Controller Hostname (default $DEFAULT_HOSTNAME): " CONTROLLER_HOSTNAME
+    CONTROLLER_HOSTNAME=${CONTROLLER_HOSTNAME:-$DEFAULT_HOSTNAME}
+
+    read -rp "Enter Server Port (default $DEFAULT_PORT): " SERVER_PORT
+    SERVER_PORT=${SERVER_PORT:-$DEFAULT_PORT}
+    read -rp "Enter App Port (default $DEFAULT_PORT): " APP_PORT
+    APP_PORT=${APP_PORT:-$DEFAULT_PORT}
+    read -rp "Enter Controller Port (default $DEFAULT_PORT): " CONTROLLER_PORT
+    CONTROLLER_PORT=${CONTROLLER_PORT:-$DEFAULT_PORT}
+
     read -rp "Real serial port (default $DEFAULT_SERIAL_PORT_REAL): " SERIAL_PORT_REAL
     SERIAL_PORT_REAL=${SERIAL_PORT_REAL:-$DEFAULT_SERIAL_PORT_REAL}
     read -rp "Sim serial port (default $DEFAULT_SERIAL_PORT_SIM): " SERIAL_PORT_SIM
     SERIAL_PORT_SIM=${SERIAL_PORT_SIM:-$DEFAULT_SERIAL_PORT_SIM}
-
-    SERVER_IP="$ip"
-    APP_IP="$ip"
-    CONTROLLER_IP="$ip"
-    SERVER_HOSTNAME="$hostname"
-    APP_HOSTNAME="$hostname"
-    CONTROLLER_HOSTNAME="$hostname"
-    SERVER_PORT="$port"
-    APP_PORT="$port"
-    CONTROLLER_PORT="$port"
   fi
-  [[ ! "$SERVER_PORT" =~ ^[0-9]+$ ]] && { log_with_timestamp "Port must be a number"; exit 1; }
+
+  [[ ! "$SERVER_PORT" =~ ^[0-9]+$ ]] && { log_with_timestamp "Server port must be a number"; exit 1; }
+  [[ ! "$APP_PORT" =~ ^[0-9]+$ ]] && { log_with_timestamp "App port must be a number"; exit 1; }
+  [[ ! "$CONTROLLER_PORT" =~ ^[0-9]+$ ]] && { log_with_timestamp "Controller port must be a number"; exit 1; }
   [[ -z "$SERIAL_PORT_REAL" || -z "$SERIAL_PORT_SIM" ]] && { log_with_timestamp "Serial ports required"; exit 1; }
+
   generate_certificates
 }
 
@@ -111,15 +115,16 @@ generate_config() {
   mkdir -p "$(dirname "$config_path")"
   case "$project" in
     "casaverde_server")
-      # Server uses raw IP:PORT (no https://)
       cat >"$config_path" <<EOF
 server = "${SERVER_IP}:${SERVER_PORT}"
+hostname = "${SERVER_HOSTNAME}"
 EOF
       cp "$config_path" "$CONFIG_DIR/config.toml" || true
       ;;
     "casaverde_app")
       cat >"$config_path" <<EOF
 server = "https://${APP_HOSTNAME}:${APP_PORT}"
+hostname = "${APP_HOSTNAME}"
 [[configs]]
 id = "blackbeard-cpu"
 type = "temperature"
@@ -175,6 +180,7 @@ EOF
     "casaverde_controller")
       cat >"$config_path" <<EOF
 server = "https://${CONTROLLER_HOSTNAME}:${CONTROLLER_PORT}"
+hostname = "${CONTROLLER_HOSTNAME}"
 controller_id = "blackbeard-pi"
 serial_port = "$SERIAL_PORT_REAL"
 light_relay_id = "relay-1"
@@ -192,46 +198,45 @@ build_project() {
   local output_dir="$4"
   local use_cross="$5"
 
+  local project_hostname="$DEFAULT_HOSTNAME"
+  case "$project" in
+    "casaverde_server") project_hostname="$SERVER_HOSTNAME" ;;
+    "casaverde_app") project_hostname="$APP_HOSTNAME" ;;
+    "casaverde_controller") project_hostname="$CONTROLLER_HOSTNAME" ;;
+  esac
+
+  export HOSTNAME="$project_hostname"
+  log_with_timestamp "HOSTNAME set to $HOSTNAME for $project build"
+
   log_with_timestamp "Checking for uncommitted changes in $project..."
   pushd "$PROJECT_ROOT/$project" >/dev/null
 
-  # Check for uncommitted changes
   if git status --porcelain | grep -q .; then
     log_with_timestamp "Uncommitted changes detected in $project:"
     git status --short | tee -a "$BUILD_LOG"
-    echo "Would you like to run 'cargo fix' to attempt fixing these changes? (y/n)"
+    echo "Would you like to run 'cargo fix'? (y/n)"
     read -r fix_changes
     if [[ "$fix_changes" =~ ^[Yy]$ ]]; then
       log_with_timestamp "Running cargo fix for $project..."
       local cargo_args="--target $target"
       [[ "$mode" == "release" ]] && cargo_args="$cargo_args --release"
-      
       if [[ "$use_cross" == "true" ]]; then
-        cross fix $cargo_args 2>&1 | tee -a "$BUILD_LOG" || {
-          log_with_timestamp "cargo fix failed for $project"; exit 1;
-        }
+        cross fix $cargo_args 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "cargo fix failed"; exit 1; }
       else
-        cargo fix $cargo_args 2>&1 | tee -a "$BUILD_LOG" || {
-          log_with_timestamp "cargo fix failed for $project"; exit 1;
-        }
+        cargo fix $cargo_args 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "cargo fix failed"; exit 1; }
       fi
-
-      # Re-check for uncommitted changes after cargo fix
       if git status --porcelain | grep -q .; then
-        log_with_timestamp "Uncommitted changes still remain after cargo fix:"
-        git status --short | tee -a "$BUILD_LOG"
-        echo "Please commit or stash changes before building, as --allow-dirty is not permitted. Exiting."
+        log_with_timestamp "Uncommitted changes remain after cargo fix. Commit/stash first."
         exit 1
       fi
     else
-      log_with_timestamp "User declined to run cargo fix. Proceeding with build for testing."
+      log_with_timestamp "User declined cargo fix. Proceeding."
     fi
   fi
 
   log_with_timestamp "Building $project for $target in $mode mode..."
   local cargo_args="--target $target"
   [[ "$mode" == "release" ]] && cargo_args="$cargo_args --release"
-
   if [[ "$use_cross" == "true" ]]; then
     cross build $cargo_args 2>&1 | tee -a "$BUILD_LOG" || exit 1
   else
@@ -258,14 +263,12 @@ deploy_project() {
 
   local bin_name="casaverde_${project##casaverde_}"
   local bin_path="$PROJECT_ROOT/target/$TARGET/$MODE/$bin_name"
-
   [[ ! -f "$bin_path" ]] && { log_with_timestamp "Binary not found for deploy: $bin_path"; exit 1; }
 
   mkdir -p "$output_dir/$project"
   cp "$bin_path" "$output_dir/$project/$bin_name"
   chmod +x "$output_dir/$project/$bin_name"
 
-  # Only copy config if it contains https://
   local config_src="$CONFIG_DIR/config.toml"
   if [[ -f "$config_src" ]] && grep -q "https://" "$config_src"; then
     generate_config "$project" "$output_dir/$project/config.toml"

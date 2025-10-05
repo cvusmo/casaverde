@@ -2,15 +2,15 @@
 // github.com/cvusmo/casaverde/casaverde_controller
 // src/main.rs - Entry point for casaverde_controller
 
+use casaverde_controller::timer::run_light_timer;
 use casaverde_controller::{client, models};
-use log::{info, error};
+use log::{error, info};
 use std::sync::Arc;
 use tokio::{spawn, sync::mpsc, time::interval};
 use casaverde_controller::config;
-use casaverde_controller::controller::{Command, process_remote_readings, process_local_rules};
+use casaverde_controller::controller::{Command, process_local_rules, process_remote_readings};
 use casaverde_controller::gpio;
-use casaverde_controller::serial::{init_serial, send_command, read_sensor_data};
-use casaverde_controller::timer::run_light_timer;
+use casaverde_controller::serial::{init_serial, read_sensor_data, send_serial_command};
 use casaverde_utils;
 
 #[tokio::main]
@@ -20,7 +20,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut config = config::load_config()?;
     let client = client::build_secure_client()?;
-    let port: Arc<tokio::sync::Mutex<Box<dyn serialport::SerialPort>>> = Arc::new(tokio::sync::Mutex::new(init_serial(&config)?));
+    let port: Arc<tokio::sync::Mutex<Box<dyn serialport::SerialPort>>> =
+        Arc::new(tokio::sync::Mutex::new(init_serial(&config)?));
 
     if let Ok(server_config) = client::fetch_config(&client, &config.server, &config.controller_id).await {
         config = server_config;
@@ -43,9 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let port = port.clone();
         let client = client.clone();
         let server = config.server.clone();
-        let is_simulation = std::env::var("SIMULATION_MODE")
-            .map(|v| v == "1")
-            .unwrap_or(false); // Default to false (production mode)
+        let is_simulation = std::env::var("SIMULATION_MODE").map(|v| v == "1").unwrap_or(false);
         spawn(async move {
             while let Some(cmd) = cmd_rx.recv().await {
                 info!("Executing command via serial: {:?}", cmd);
@@ -54,10 +53,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 let mut guard = port.lock().await;
                 let port_ref: &mut dyn serialport::SerialPort = &mut **guard;
-                if let Err(e) = send_command(port_ref, &cmd) {
+                if let Err(e) = send_serial_command(port_ref, &cmd) {
                     error!("Error sending command via serial: {}", e);
                 }
-                // Query all sensors in simulation mode
                 if is_simulation {
                     if let Err(e) = client::simulation_commands(&client, &server, is_simulation).await {
                         error!("Simulation command error: {}", e);
@@ -87,9 +85,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let local_temp = gpio::read_temperature();
         info!("Local temperature reading: {:?}", local_temp);
 
-        let probe_temp = sensor_data.as_ref().and_then(|data| {
-            data.iter().find(|d| d.id == "blackbeard-probe").and_then(|d| d.value)
-        });
+        let probe_temp = sensor_data
+            .as_ref()
+            .and_then(|data| data.iter().find(|d| d.id == "blackbeard-probe").and_then(|d| d.value));
 
         let remote_commands = process_remote_readings(&readings, &config.controller_id);
         let local_commands = process_local_rules(&config, local_temp.unwrap_or_default().into());
