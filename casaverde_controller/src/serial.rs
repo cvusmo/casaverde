@@ -15,12 +15,14 @@ pub fn init_serial(
         error!("Serial port not configured in config.toml");
         serialport::Error::new(serialport::ErrorKind::NoDevice, "Serial port not found")
     })?;
+
     let port = serialport::new(port_name, 9600)
         .timeout(Duration::from_secs(5))
         .data_bits(DataBits::Eight)
         .parity(Parity::None)
         .stop_bits(StopBits::One)
         .open();
+
     match port {
         Ok(p) => {
             p.clear(ClearBuffer::Input)?;
@@ -39,7 +41,6 @@ pub fn send_serial_command(
     port: &mut dyn serialport::SerialPort,
     cmd: &Command,
 ) -> Result<Vec<u8>, serialport::Error> {
-    // Map command enum to string
     let command = match cmd {
         Command::TurnOnCooling => "SET FAN1 ON\n",
         Command::TurnOffCooling => "SET FAN1 OFF\n",
@@ -57,40 +58,123 @@ pub fn send_serial_command(
         Command::GetHumidity => "GET humidity-1\n",
         Command::GetSolar => "GET solar-1\n",
         Command::GetWater => "GET water-1\n",
-        Command::TurnOnRelay2 => "ON_INT2\n",
-        Command::TurnOffRelay2 => "OFF_INT2\n",
+        Command::TurnOnRelay2 => "SET RELAY2 ON\n",
+        Command::TurnOffRelay2 => "SET RELAY2 OFF\n",
     };
 
-    // Send command
     port.write_all(command.as_bytes())?;
-
-    // Read response (up to 1024 bytes)
     let mut buffer = [0u8; 1024];
     let n = port.read(&mut buffer)?;
-
     Ok(buffer[..n].to_vec())
 }
 
+/// Fully data-driven, DOD/DOP compliant sensor reading
 pub fn read_sensor_data(port: &mut dyn serialport::SerialPort) -> Option<Vec<DeviceReading>> {
     let mut readings = Vec::new();
-    let sensor_commands = vec![
-        Command::GetProbeTemp,
-        Command::GetMoisture,
-        Command::GetHumidity,
-        Command::GetSolar,
-        Command::GetWater,
+
+    // Device table
+    struct Device<'a> {
+        cmd: Command,
+        prefix: &'a str,
+        id: &'a str,
+        parser: fn(&str) -> Option<f32>,
+    }
+
+    // Parsers
+    fn float_parser(resp: &str) -> Option<f32> {
+        resp.trim().parse::<f32>().ok()
+    }
+
+    fn binary_parser(on: &str, off: &str, resp: &str) -> Option<f32> {
+        if resp == on {
+            Some(1.0)
+        } else if resp == off {
+            Some(0.0)
+        } else {
+            None
+        }
+    }
+
+    // Define all devices in a single table
+    let devices: &[Device] = &[
+        // Sensors
+        Device {
+            cmd: Command::GetProbeTemp,
+            prefix: "TEMP_PROBE:",
+            id: "blackbeard-probe",
+            parser: float_parser,
+        },
+        Device {
+            cmd: Command::GetMoisture,
+            prefix: "MOISTURE:",
+            id: "moisture-1",
+            parser: float_parser,
+        },
+        Device {
+            cmd: Command::GetHumidity,
+            prefix: "HUMIDITY:",
+            id: "humidity-1",
+            parser: float_parser,
+        },
+        Device {
+            cmd: Command::GetSolar,
+            prefix: "SOLAR:",
+            id: "solar-1",
+            parser: float_parser,
+        },
+        Device {
+            cmd: Command::GetWater,
+            prefix: "WATER:",
+            id: "water-1",
+            parser: float_parser,
+        },
+        // Relays / fans
+        Device {
+            cmd: Command::TurnOnRelay2,
+            prefix: "RELAY2:",
+            id: "relay-2",
+            parser: |s| binary_parser("RELAY2:ON", "RELAY2:OFF", s),
+        },
+        Device {
+            cmd: Command::TurnOnCooling,
+            prefix: "FAN:",
+            id: "FAN1",
+            parser: |s| binary_parser("FAN:ON", "FAN:OFF", s),
+        },
+        Device {
+            cmd: Command::TurnOnMoisture,
+            prefix: "RELAY:",
+            id: "relay-1",
+            parser: |s| binary_parser("RELAY:ON", "RELAY:OFF", s),
+        },
     ];
 
-    for cmd in sensor_commands {
-        match send_serial_command(port, &cmd) {
+    // Process each device
+    for device in devices {
+        match send_serial_command(port, &device.cmd) {
             Ok(response) => {
                 let line = String::from_utf8_lossy(&response).trim().to_string();
                 info!("Processing response: {}", line);
-                match_response(&line, &mut readings);
+
+                if line.starts_with(device.prefix) {
+                    match (device.parser)(&line) {
+                        Some(value) => readings.push(DeviceReading {
+                            id: device.id.to_string(),
+                            value: Some(value),
+                        }),
+                        None => error!("Failed to parse value from response: {}", line),
+                    }
+                } else {
+                    error!(
+                        "Unexpected response prefix: {} (expected {})",
+                        line, device.prefix
+                    );
+                }
             }
-            Err(e) => {
-                error!("Failed to read sensor data for command {:?}: {}", cmd, e);
-            }
+            Err(e) => error!(
+                "Failed to read sensor data for command {:?}: {}",
+                device.cmd, e
+            ),
         }
     }
 
@@ -100,41 +184,5 @@ pub fn read_sensor_data(port: &mut dyn serialport::SerialPort) -> Option<Vec<Dev
     } else {
         error!("No valid sensor readings collected");
         None
-    }
-}
-
-fn match_response(response: &str, readings: &mut Vec<DeviceReading>) {
-    macro_rules! match_sensor {
-        ($prefix:expr, $id:expr, $readings:expr) => {
-            if let Some(value) = response
-                .strip_prefix($prefix)
-                .and_then(|v| v.trim().parse::<f32>().ok())
-            {
-                $readings.push(DeviceReading {
-                    id: $id.to_string(),
-                    value: Some(value),
-                });
-                return;
-            }
-        };
-    }
-    match_sensor!("TEMP:", "blackbeard-cpu", readings);
-    match_sensor!("TEMP_PROBE:", "blackbeard-probe", readings);
-    match_sensor!("SOLAR:", "solar-1", readings);
-    match_sensor!("MOISTURE:", "moisture-1", readings);
-    match_sensor!("HUMIDITY:", "humidity-1", readings);
-    match_sensor!("WATER:", "water-1", readings);
-    if response.starts_with("RELAY:") {
-        readings.push(DeviceReading {
-            id: "relay-1".to_string(),
-            value: Some(if response == "RELAY:ON" { 1.0 } else { 0.0 }),
-        });
-    } else if response.starts_with("FAN:") {
-        readings.push(DeviceReading {
-            id: "FAN1".to_string(),
-            value: Some(if response == "FAN:ON" { 1.0 } else { 0.0 }),
-        });
-    } else {
-        error!("Unrecognized response format: {}", response);
     }
 }
