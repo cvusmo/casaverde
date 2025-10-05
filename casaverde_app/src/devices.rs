@@ -5,7 +5,6 @@
 use crate::{client::AppClient, models::{ConfigEntry}};
 use log::{error, info};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use tokio::time::Duration;
 
 #[derive(Copy, Clone, PartialEq)]

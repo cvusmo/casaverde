@@ -4,7 +4,7 @@
 
 use tokio::time::Duration;
 use casaverde_app::tui::{handle_tui_events, render_tui};
-use casaverde_app::app::{run_app, CasaverdeApp};
+use casaverde_app::app::CasaverdeApp;
 use casaverde_app::touch::run_touchscreen;
 use casaverde_utils;
 use clap::Parser;

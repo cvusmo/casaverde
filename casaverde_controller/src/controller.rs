@@ -2,9 +2,7 @@
 // github.com/cvusmo/casaverde/casaverde_controller
 // src/controller.rs
 
-use log::info;
 use serde_json::Value;
-use tokio::time::interval;
 
 #[derive(Debug, Clone)]
 pub enum Command {

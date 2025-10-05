@@ -1,10 +1,7 @@
 // casaverde_utils/src/lib.rs
 use env_logger::{Builder, Target};
 use log::LevelFilter;
-use std::fs::File;
 use std::io::Write;
-use std::path::Path;
-use tokio::time::Instant;
 
 pub fn init_logger(app_name: &str, log_level: LevelFilter) -> Result<(), std::io::Error> {
     let bin_dir = std::env::current_exe()

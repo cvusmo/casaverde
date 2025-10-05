@@ -3,384 +3,307 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_OUTPUT="${PROJECT_ROOT}/build_output"
-TESTING_ROOT="${PROJECT_ROOT}/casaverde_test"
 CONFIG_DIR="${HOME}/.config/casaverde_server"
-BUILD_LOG="${PROJECT_ROOT}/build.log"
+APP_CONFIG_DIR="${HOME}/.config/casaverde_app"
+LOG_DIR="${BUILD_OUTPUT}/linux/logs"
+BUILD_LOG="${LOG_DIR}/build.log"
+
+# Default SETUP
 DEFAULT_IP="127.0.0.1"
+DEFAULT_HOSTNAME="localhost"
 DEFAULT_PORT="3003"
+DEFAULT_SERIAL_PORT_REAL="/dev/ttyACM0"
+DEFAULT_SERIAL_PORT_SIM="/tmp/virtualcom0"
 
-# Default values for URLs and ports
-SERVER_URL="https://${DEFAULT_IP}:${DEFAULT_PORT}"
-APP_URL="https://${DEFAULT_IP}:${DEFAULT_PORT}"
-CONTROLLER_URL="https://${DEFAULT_IP}:${DEFAULT_PORT}"
-PORT="${DEFAULT_PORT}"
+# CUSTOM SETUP
+SERVER_IP="$DEFAULT_IP"
+APP_IP="$DEFAULT_IP"
+CONTROLLER_IP="$DEFAULT_IP"
+SERVER_HOSTNAME="$DEFAULT_HOSTNAME"
+APP_HOSTNAME="$DEFAULT_HOSTNAME"
+CONTROLLER_HOSTNAME="$DEFAULT_HOSTNAME"
 
-# Define all target platforms and their Rust targets
+SERVER_PORT="$DEFAULT_PORT"
+APP_PORT="$DEFAULT_PORT"
+CONTROLLER_PORT="$DEFAULT_PORT"
+
+SERIAL_PORT_REAL="$DEFAULT_SERIAL_PORT_REAL"
+SERIAL_PORT_SIM="$DEFAULT_SERIAL_PORT_SIM"
+
+# Define target platform for native Linux
 declare -A TARGETS
 TARGETS["linux"]="x86_64-unknown-linux-gnu"
-TARGETS["windows"]="x86_64-pc-windows-gnu"
-TARGETS["raspberry_pi_arm"]="armv7-unknown-linux-gnueabihf"
-TARGETS["raspberry_pi_arm64"]="aarch64-unknown-linux-gnu"
+#TODO: add windows and others
+# TARGETS["windows"]="x86_64-pc-windows-gnu"
+# TARGETS["raspberry_pi_arm"]="armv7-unknown-linux-gnueabihf"
+# TARGETS["raspberry_pi_arm64"]="aarch64-unknown-linux-gnu"
 
-# Output directories for each platform
-mkdir -p "${BUILD_OUTPUT}/linux" "${BUILD_OUTPUT}/windows" "${BUILD_OUTPUT}/raspberry_pi/arm" "${BUILD_OUTPUT}/raspberry_pi/arm64"
+mkdir -p "${BUILD_OUTPUT}/linux"
+mkdir -p "$LOG_DIR"
 
 log_with_timestamp() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$BUILD_LOG"
 }
 
+generate_certificates() {
+  local cert_path="$CONFIG_DIR/server.crt"
+  local key_path="$CONFIG_DIR/server.key"
+  local cn="$SERVER_IP"  # Use SERVER_IP for CN
+
+  # Check if certificate exists and has correct CN
+  if [[ -f "$cert_path" && -f "$key_path" ]]; then
+    existing_cn=$(openssl x509 -in "$cert_path" -noout -subject | grep -o 'CN\s*=\s*[^\s]*' | cut -d'=' -f2 | tr -d ' ')
+    if [[ "$existing_cn" == "$cn" ]]; then
+      log_with_timestamp "Existing certificate matches CN=$cn, reusing it."
+      chmod +r "$cert_path" "$key_path" 2>/dev/null || true
+      mkdir -p "$APP_CONFIG_DIR" && chmod u+rwx "$APP_CONFIG_DIR" 2>/dev/null || true
+      cp "$cert_path" "$APP_CONFIG_DIR/server.crt" 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Failed copying cert"; exit 1; }
+      return
+    else
+      log_with_timestamp "Existing certificate has CN=$existing_cn, but need CN=$cn. Regenerating..."
+    fi
+  fi
+
+  log_with_timestamp "Generating self-signed TLS certificate for CN=$cn..."
+  mkdir -p "$CONFIG_DIR" || { log_with_timestamp "Error creating $CONFIG_DIR"; exit 1; }
+  chmod u+rwx "$CONFIG_DIR" 2>/dev/null || true
+  openssl req -x509 -newkey rsa:4096 -keyout "$key_path" -out "$cert_path" \
+    -sha256 -days 3650 -nodes -subj "/CN=$cn" 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Certificate generation failed"; exit 1; }
+  log_with_timestamp "Certificate generated at $cert_path"
+  chmod +r "$cert_path" "$key_path" 2>/dev/null || true
+  mkdir -p "$APP_CONFIG_DIR" && chmod u+rwx "$APP_CONFIG_DIR" 2>/dev/null || true
+  cp "$cert_path" "$APP_CONFIG_DIR/server.crt" 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Failed copying cert"; exit 1; }
+}
+
 prompt_config() {
-  echo "Do you want to use default settings? (IP: $DEFAULT_IP, Port: $DEFAULT_PORT) (y/n)"
+  echo "Use default settings? IP: $DEFAULT_IP, Hostname: $DEFAULT_HOSTNAME, Port: $DEFAULT_PORT, Real Serial: $DEFAULT_SERIAL_PORT_REAL, Sim Serial: $DEFAULT_SERIAL_PORT_SIM (y/n)"
   read -r use_defaults
   if [[ ! "$use_defaults" =~ ^[Yy]$ ]]; then
-    echo "Enter the IP address for all components (default: $DEFAULT_IP):"
-    read -r ip
+    read -rp "Enter IP (default $DEFAULT_IP): " ip
     ip=${ip:-$DEFAULT_IP}
-    echo "Enter the port number for all components (default: $DEFAULT_PORT):"
-    read -r PORT
-    PORT=${PORT:-$DEFAULT_PORT}
-    SERVER_URL="https://$ip:$PORT"
-    APP_URL="https://$ip:$PORT"
-    CONTROLLER_URL="https://$ip:$PORT"
-  fi
+    read -rp "Enter Hostname (default $DEFAULT_HOSTNAME): " hostname
+    hostname=${hostname:-$DEFAULT_HOSTNAME}
+    read -rp "Enter Port (default $DEFAULT_PORT): " port
+    port=${port:-$DEFAULT_PORT}
+    read -rp "Real serial port (default $DEFAULT_SERIAL_PORT_REAL): " SERIAL_PORT_REAL
+    SERIAL_PORT_REAL=${SERIAL_PORT_REAL:-$DEFAULT_SERIAL_PORT_REAL}
+    read -rp "Sim serial port (default $DEFAULT_SERIAL_PORT_SIM): " SERIAL_PORT_SIM
+    SERIAL_PORT_SIM=${SERIAL_PORT_SIM:-$DEFAULT_SERIAL_PORT_SIM}
 
-  # Validate inputs
-  if [[ -z "$SERVER_URL" || -z "$APP_URL" || -z "$CONTROLLER_URL" ]]; then
-    log_with_timestamp "Error: All URLs must be provided."
-    exit 1
+    SERVER_IP="$ip"
+    APP_IP="$ip"
+    CONTROLLER_IP="$ip"
+    SERVER_HOSTNAME="$hostname"
+    APP_HOSTNAME="$hostname"
+    CONTROLLER_HOSTNAME="$hostname"
+    SERVER_PORT="$port"
+    APP_PORT="$port"
+    CONTROLLER_PORT="$port"
   fi
-  if [[ ! "$SERVER_URL" =~ ^https:// || ! "$APP_URL" =~ ^https:// || ! "$CONTROLLER_URL" =~ ^https:// ]]; then
-    log_with_timestamp "Error: All URLs must start with https://"
-    exit 1
-  fi
-  if ! [[ "$PORT" =~ ^[0-9]+$ ]]; then
-    log_with_timestamp "Error: Port must be a valid number"
-    exit 1
-  fi
+  [[ ! "$SERVER_PORT" =~ ^[0-9]+$ ]] && { log_with_timestamp "Port must be a number"; exit 1; }
+  [[ -z "$SERIAL_PORT_REAL" || -z "$SERIAL_PORT_SIM" ]] && { log_with_timestamp "Serial ports required"; exit 1; }
+  generate_certificates
 }
 
-build_project() {
+generate_config() {
   local project="$1"
-  local mode="$2" # "debug" or "release"
-  local target="$3"
-  local output_dir="$4"
-  local use_cross="$5" # "true" for cross-compilation, "false" for native
-
-  log_with_timestamp "Building $project for target $target in $mode mode..."
-  if [[ ! -d "$PROJECT_ROOT/$project" ]]; then
-    log_with_timestamp "Error: Project directory $PROJECT_ROOT/$project does not exist"
-    exit 1
-  fi
-  pushd "$PROJECT_ROOT/$project" >/dev/null || {
-    log_with_timestamp "Error: Failed to enter $project directory"
-    exit 1
-  }
-
-  local cargo_args="--target $target"
-  if [[ "$mode" == "release" ]]; then
-    cargo_args="$cargo_args --release"
-  fi
-
-  if [[ "$use_cross" == "true" ]]; then
-    cross build $cargo_args 2>&1 | tee -a "$BUILD_LOG" || {
-      log_with_timestamp "Error: Build failed for $project on $target"
-      exit 1
-    }
-  else
-    cargo build $cargo_args 2>&1 | tee -a "$BUILD_LOG" || {
-      log_with_timestamp "Error: Build failed for $project on $target"
-      exit 1
-    }
-  fi
-  popd >/dev/null
-
-  if [[ "$project" != "casaverde_utils" ]]; then
-    # Copy binary to output directory
-    local bin_name="casaverde_${project##casaverde_}"
-    local bin_path="$PROJECT_ROOT/target/$target/$mode/$bin_name"
-    if [[ "$target" == "x86_64-pc-windows-gnu" ]]; then
-      bin_path="${bin_path}.exe"
-      bin_name="${bin_name}.exe"
-    fi
-    if [[ -f "$bin_path" ]]; then
-      cp "$bin_path" "$output_dir/$bin_name" || {
-        log_with_timestamp "Error: Failed to copy $bin_name to $output_dir"
-        exit 1
-      }
-      log_with_timestamp "Copied $bin_name to $output_dir"
-    else
-      log_with_timestamp "Error: Binary $bin_name not found at $bin_path"
-      exit 1
-    fi
-  fi
-  log_with_timestamp "Build complete: $project for $target in $mode mode"
-}
-
-setup_test_environment() {
-  log_with_timestamp "Setting up test environment in $TESTING_ROOT..."
-  mkdir -p "$TESTING_ROOT/casaverde_app" "$TESTING_ROOT/casaverde_controller" "$TESTING_ROOT/casaverde_server" || {
-    log_with_timestamp "Error: Failed to create testing directories"
-    exit 1
-  }
-  mkdir -p "$CONFIG_DIR" || {
-    log_with_timestamp "Error: Failed to create $CONFIG_DIR"
-    exit 1
-  }
-
-  # Generate config.toml for casaverde_server
-  local server_config="$CONFIG_DIR/config.toml"
-  cat >"$server_config" <<EOF
-server = "$SERVER_URL"
+  local config_path="$2"
+  mkdir -p "$(dirname "$config_path")"
+  case "$project" in
+    "casaverde_server")
+      # Server uses raw IP:PORT (no https://)
+      cat >"$config_path" <<EOF
+server = "${SERVER_IP}:${SERVER_PORT}"
 EOF
-  log_with_timestamp "Generated $server_config with server URL $SERVER_URL"
-
-  # Copy Linux binaries to test environment (for local testing on Arch Linux)
-  for project in "casaverde_app" "casaverde_controller" "casaverde_server"; do
-    local bin_name="casaverde_${project##casaverde_}"
-    local bin_path="$BUILD_OUTPUT/linux/$bin_name"
-    local dest_dir="$TESTING_ROOT/$project"
-    if [[ -f "$bin_path" ]]; then
-      cp "$bin_path" "$dest_dir/$bin_name" || {
-        log_with_timestamp "Error: Failed to copy $bin_name to $dest_dir"
-        exit 1
-      }
-      log_with_timestamp "Copied $bin_name to $dest_dir"
-    else
-      log_with_timestamp "Error: Binary $bin_name not found at $bin_path"
-      exit 1
-    fi
-  done
-
-  # Generate or update config.toml for casaverde_app
-  local app_config="$TESTING_ROOT/casaverde_app/config.toml"
-  cat >"$app_config" <<EOF
-server = "$APP_URL"
-
+      cp "$config_path" "$CONFIG_DIR/config.toml" || true
+      ;;
+    "casaverde_app")
+      cat >"$config_path" <<EOF
+server = "https://${APP_HOSTNAME}:${APP_PORT}"
 [[configs]]
 id = "blackbeard-cpu"
 type = "temperature"
 endpoint = "/sensor_data"
 interval = 15
-serial_port = ""
+serial_port = "$SERIAL_PORT_REAL"
 
 [[configs]]
 id = "solar-1"
 type = "solar"
 endpoint = "/sensor_data"
-serial_port = ""
+serial_port = "$SERIAL_PORT_SIM"
 interval = 15
 
 [[configs]]
 id = "moisture-1"
 type = "moisture"
 endpoint = "/sensor_data"
-serial_port = ""
+serial_port = "$SERIAL_PORT_SIM"
 interval = 15
 
 [[configs]]
 id = "humidity-1"
 type = "humidity"
 endpoint = "/sensor_data"
-serial_port = ""
+serial_port = "$SERIAL_PORT_SIM"
 interval = 15
 
 [[configs]]
 id = "water-1"
 type = "water"
 endpoint = "/sensor_data"
-serial_port = ""
+serial_port = "$SERIAL_PORT_SIM"
 interval = 15
 
 [[configs]]
 id = "relay-1"
 type = "relay"
 endpoint = "/relay_control"
-serial_port = ""
+serial_port = "$SERIAL_PORT_SIM"
 interval = 15
 
 [[configs]]
 id = "blackbeard-probe"
 type = "temperature"
 endpoint = "/sensor_data"
-serial_port = ""
+serial_port = "$SERIAL_PORT_REAL"
 interval = 15
 EOF
-  log_with_timestamp "Generated $app_config with server URL $APP_URL"
-
-  # Generate or update config.toml for casaverde_controller
-  local controller_config="$TESTING_ROOT/casaverde_controller/config.toml"
-  cat >"$controller_config" <<EOF
-server = "$CONTROLLER_URL"
+      mkdir -p "$APP_CONFIG_DIR"
+      cp "$config_path" "$APP_CONFIG_DIR/config.toml" || true
+      ;;
+    "casaverde_controller")
+      cat >"$config_path" <<EOF
+server = "https://${CONTROLLER_HOSTNAME}:${CONTROLLER_PORT}"
 controller_id = "blackbeard-pi"
-serial_port = "/dev/ttyACM0"
+serial_port = "$SERIAL_PORT_REAL"
 light_relay_id = "relay-1"
 light_on_hours = 16
 light_off_hours = 8
 EOF
-  log_with_timestamp "Generated $controller_config with server URL $CONTROLLER_URL"
-
-  # Generate self-signed TLS certificate
-  local cert_path="$CONFIG_DIR/server.crt"
-  local key_path="$CONFIG_DIR/server.key"
-  if [[ ! -f "$cert_path" || ! -f "$key_path" ]]; then
-    log_with_timestamp "Generating self-signed TLS certificate..."
-    mkdir -p "$CONFIG_DIR" || {
-      log_with_timestamp "Error: Failed to create $CONFIG_DIR"
-      exit 1
-    }
-    openssl req -x509 -newkey rsa:4096 -keyout "$key_path" -out "$cert_path" \
-      -sha256 -days 3650 -nodes -subj "/CN=casaverde.local" 2>&1 | tee -a "$BUILD_LOG" || {
-      log_with_timestamp "Error: Failed to generate certificate"
-      exit 1
-    }
-    log_with_timestamp "Certificate generated at $cert_path"
-  fi
-  for project in "casaverde_app" "casaverde_controller"; do
-    local dest_cert="$TESTING_ROOT/$project/server.crt"
-    cp "$cert_path" "$dest_cert" || {
-      log_with_timestamp "Error: Failed to copy server.crt to $dest_cert"
-      exit 1
-    }
-    log_with_timestamp "Copied server.crt to $dest_cert"
-  done
-
-  # Copy configs and certificates to platform-specific directories
-  for platform in "linux" "windows" "raspberry_pi/arm" "raspberry_pi/arm64"; do
-    local dest_dir="$BUILD_OUTPUT/$platform"
-    cp "$app_config" "$dest_dir/casaverde_app_config.toml" || {
-      log_with_timestamp "Error: Failed to copy app config to $dest_dir"
-      exit 1
-    }
-    cp "$controller_config" "$dest_dir/casaverde_controller_config.toml" || {
-      log_with_timestamp "Error: Failed to copy controller config to $dest_dir"
-      exit 1
-    }
-    cp "$server_config" "$dest_dir/casaverde_server_config.toml" || {
-      log_with_timestamp "Error: Failed to copy server config to $dest_dir"
-      exit 1
-    }
-    cp "$cert_path" "$dest_dir/server.crt" || {
-      log_with_timestamp "Error: Failed to copy server.crt to $dest_dir"
-      exit 1
-    }
-    cp "$key_path" "$dest_dir/server.key" || {
-      log_with_timestamp "Error: Failed to copy server.key to $dest_dir"
-      exit 1
-    }
-    log_with_timestamp "Copied configuration files and certificates to $dest_dir"
-  done
-
-  log_with_timestamp "Test environment setup complete"
+      ;;
+  esac
 }
 
-open_port() {
-  log_with_timestamp "Opening port $PORT for casaverde_server..."
-  case "$(uname -s)" in
-  Linux*)
-    if command -v ufw >/dev/null; then
-      sudo ufw allow "$PORT/tcp" && sudo ufw reload 2>&1 | tee -a "$BUILD_LOG" || {
-        log_with_timestamp "Error: Failed to open port $PORT with ufw"
+build_project() {
+  local project="$1"
+  local mode="$2"
+  local target="$3"
+  local output_dir="$4"
+  local use_cross="$5"
+
+  log_with_timestamp "Checking for uncommitted changes in $project..."
+  pushd "$PROJECT_ROOT/$project" >/dev/null
+
+  # Check for uncommitted changes
+  if git status --porcelain | grep -q .; then
+    log_with_timestamp "Uncommitted changes detected in $project:"
+    git status --short | tee -a "$BUILD_LOG"
+    echo "Would you like to run 'cargo fix' to attempt fixing these changes? (y/n)"
+    read -r fix_changes
+    if [[ "$fix_changes" =~ ^[Yy]$ ]]; then
+      log_with_timestamp "Running cargo fix for $project..."
+      local cargo_args="--target $target"
+      [[ "$mode" == "release" ]] && cargo_args="$cargo_args --release"
+      
+      if [[ "$use_cross" == "true" ]]; then
+        cross fix $cargo_args 2>&1 | tee -a "$BUILD_LOG" || {
+          log_with_timestamp "cargo fix failed for $project"; exit 1;
+        }
+      else
+        cargo fix $cargo_args 2>&1 | tee -a "$BUILD_LOG" || {
+          log_with_timestamp "cargo fix failed for $project"; exit 1;
+        }
+      fi
+
+      # Re-check for uncommitted changes after cargo fix
+      if git status --porcelain | grep -q .; then
+        log_with_timestamp "Uncommitted changes still remain after cargo fix:"
+        git status --short | tee -a "$BUILD_LOG"
+        echo "Please commit or stash changes before building, as --allow-dirty is not permitted. Exiting."
         exit 1
-      }
+      fi
     else
-      log_with_timestamp "ufw not found. Please manually open port $PORT:"
-      log_with_timestamp "  sudo firewall-cmd --add-port=$PORT/tcp --permanent"
-      log_with_timestamp "  sudo firewall-cmd --reload"
+      log_with_timestamp "User declined to run cargo fix. Proceeding with build for testing."
     fi
-    ;;
-  *)
-    log_with_timestamp "Port opening not supported on this OS for testing. Please manually open port $PORT if needed."
-    ;;
-  esac
-  log_with_timestamp "Port $PORT configuration complete"
+  fi
+
+  log_with_timestamp "Building $project for $target in $mode mode..."
+  local cargo_args="--target $target"
+  [[ "$mode" == "release" ]] && cargo_args="$cargo_args --release"
+
+  if [[ "$use_cross" == "true" ]]; then
+    cross build $cargo_args 2>&1 | tee -a "$BUILD_LOG" || exit 1
+  else
+    cargo build $cargo_args 2>&1 | tee -a "$BUILD_LOG" || exit 1
+  fi
+
+  popd >/dev/null
+
+  local bin_name="casaverde_${project##casaverde_}"
+  local bin_path="$PROJECT_ROOT/target/$target/$mode/$bin_name"
+  [[ ! -f "$bin_path" ]] && { log_with_timestamp "Binary not found: $bin_path"; exit 1; }
+  mkdir -p "$output_dir/$project"
+  cp "$bin_path" "$output_dir/$project/$bin_name"
+  chmod +x "$output_dir/$project/$bin_name"
+  generate_config "$project" "$output_dir/$project/config.toml"
+  cp "$CONFIG_DIR/server.crt" "$output_dir/$project/" || true
+  [[ "$project" == "casaverde_server" ]] && cp "$CONFIG_DIR/server.key" "$output_dir/$project/" || true
+  log_with_timestamp "Built $project successfully"
+}
+
+deploy_project() {
+  local project="$1"
+  local output_dir="$2"
+
+  local bin_name="casaverde_${project##casaverde_}"
+  local bin_path="$PROJECT_ROOT/target/$TARGET/$MODE/$bin_name"
+
+  [[ ! -f "$bin_path" ]] && { log_with_timestamp "Binary not found for deploy: $bin_path"; exit 1; }
+
+  mkdir -p "$output_dir/$project"
+  cp "$bin_path" "$output_dir/$project/$bin_name"
+  chmod +x "$output_dir/$project/$bin_name"
+
+  # Only copy config if it contains https://
+  local config_src="$CONFIG_DIR/config.toml"
+  if [[ -f "$config_src" ]] && grep -q "https://" "$config_src"; then
+    generate_config "$project" "$output_dir/$project/config.toml"
+    cp "$CONFIG_DIR/server.crt" "$output_dir/$project/" || true
+    [[ "$project" == "casaverde_server" ]] && cp "$CONFIG_DIR/server.key" "$output_dir/$project/" || true
+  else
+    log_with_timestamp "Skipping config copy for $project (no https:// found)"
+  fi
+
+  log_with_timestamp "Deployed $project successfully"
 }
 
 main() {
   local action="${1:-}"
-  if [[ -z "$action" ]]; then
-    log_with_timestamp "Error: No action provided. Usage: $0 [debug | release | clean]"
-    exit 1
-  fi
+  [[ -z "$action" ]] && { log_with_timestamp "Usage: $0 [debug|release|deploy|clean]"; exit 1; }
 
-  if [[ "$action" == "debug" || "$action" == "release" ]]; then
-    prompt_config
-  fi
+  [[ "$action" =~ ^(debug|release|deploy)$ ]] && prompt_config
 
-  log_with_timestamp "Starting build process: $action with SERVER_URL=$SERVER_URL, APP_URL=$APP_URL, CONTROLLER_URL=$CONTROLLER_URL, PORT=$PORT"
   case "$action" in
-  "debug")
-    log_with_timestamp "Starting debug build process for all components..."
-    # Build for Linux (native)
-    for project in "casaverde_server" "casaverde_app" "casaverde_controller"; do
-      build_project "$project" "debug" "${TARGETS[linux]}" "${BUILD_OUTPUT}/linux" "false"
-    done
-    # Cross-compile for Windows
-    for project in "casaverde_server" "casaverde_app" "casaverde_controller"; do
-      build_project "$project" "debug" "${TARGETS[windows]}" "${BUILD_OUTPUT}/windows" "true"
-    done
-    # Cross-compile for Raspberry Pi (ARM and ARM64)
-    for project in "casaverde_server" "casaverde_app" "casaverde_controller"; do
-      build_project "$project" "debug" "${TARGETS[raspberry_pi_arm]}" "${BUILD_OUTPUT}/raspberry_pi/arm" "true"
-      build_project "$project" "debug" "${TARGETS[raspberry_pi_arm64]}" "${BUILD_OUTPUT}/raspberry_pi/arm64" "true"
-    done
-    setup_test_environment
-    open_port
-    log_with_timestamp "Debug build and test environment setup complete"
-    echo "Do you want to deploy now? (y/n)"
-    read -r deploy_now
-    if [[ "$deploy_now" =~ ^[Yy]$ ]]; then
-      if [[ -f "$PROJECT_ROOT/deploy.sh" ]]; then
-        ./deploy.sh
-      else
-        log_with_timestamp "Warning: deploy.sh not found, skipping deployment"
-      fi
-    fi
-    ;;
-  "release")
-    log_with_timestamp "Starting release build process for all components..."
-    # Build for Linux (native)
-    for project in "casaverde_server" "casaverde_app" "casaverde_controller"; do
-      build_project "$project" "release" "${TARGETS[linux]}" "${BUILD_OUTPUT}/linux" "false"
-    done
-    # Cross-compile for Windows
-    for project in "casaverde_server" "casaverde_app" "casaverde_controller"; do
-      build_project "$project" "release" "${TARGETS[windows]}" "${BUILD_OUTPUT}/windows" "true"
-    done
-    # Cross-compile for Raspberry Pi (ARM and ARM64)
-    for project in "casaverde_server" "casaverde_app" "casaverde_controller"; do
-      build_project "$project" "release" "${TARGETS[raspberry_pi_arm]}" "${BUILD_OUTPUT}/raspberry_pi/arm" "true"
-      build_project "$project" "release" "${TARGETS[raspberry_pi_arm64]}" "${BUILD_OUTPUT}/raspberry_pi/arm64" "true"
-    done
-    setup_test_environment
-    if [[ -f "$PROJECT_ROOT/deploy.sh" ]]; then
-      ./deploy.sh
-    else
-      log_with_timestamp "Warning: deploy.sh not found, skipping deployment"
-    fi
-    log_with_timestamp "Release build complete"
-    ;;
-  "clean")
-    log_with_timestamp "Cleaning build artifacts..."
-    cargo clean --manifest-path "$PROJECT_ROOT/Cargo.toml" 2>&1 | tee -a "$BUILD_LOG" || {
-      log_with_timestamp "Error: Clean failed"
-      exit 1
-    }
-    if [[ -d "$BUILD_OUTPUT" ]]; then
-      rm -rf "$BUILD_OUTPUT" || {
-        log_with_timestamp "Warning: Failed to remove $BUILD_OUTPUT, possibly due to permissions"
-      }
-    fi
-    if [[ -d "$TESTING_ROOT" ]]; then
-      rm -rf "$TESTING_ROOT" || {
-        log_with_timestamp "Warning: Failed to remove $TESTING_ROOT, possibly due to permissions"
-      }
-    fi
-    log_with_timestamp "Cleanup complete"
-    ;;
-  *)
-    log_with_timestamp "Usage: $0 [debug | release | clean]"
-    exit 1
-    ;;
+    "debug"|"release")
+      for project in "casaverde_server" "casaverde_app" "casaverde_controller"; do
+        build_project "$project" "$action" "${TARGETS[linux]}" "${BUILD_OUTPUT}/linux" "false"
+      done
+      log_with_timestamp "$action build complete"
+      ;;
+    "deploy")
+      MODE="release"
+      TARGET="${TARGETS[linux]}"
+      for project in "casaverde_server" "casaverde_controller"; do
+        build_project "$project" "$MODE" "$TARGET" "${BUILD_OUTPUT}/linux" "false"
+        deploy_project "$project" "${BUILD_OUTPUT}/linux"
+      done
+      ;;
+    "clean")
+      cargo clean --manifest-path "$PROJECT_ROOT/Cargo.toml" 2>&1 | tee -a "$BUILD_LOG" || true
+      rm -rf "$BUILD_OUTPUT" || true
+      log_with_timestamp "Clean complete"
+      ;;
   esac
 }
 

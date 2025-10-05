@@ -35,9 +35,11 @@ pub fn build_secure_client() -> Result<Client, Box<dyn std::error::Error>> {
     })?;
     info!("Certificate loaded successfully");
 
+    // TODO: fix certs and hostname
     Ok(Client::builder()
         .add_root_certificate(cert)
-        .danger_accept_invalid_certs(true)
+        .danger_accept_invalid_certs(true) // bypass
+        .danger_accept_invalid_hostnames(true) // bypass hostname
         .use_rustls_tls()
         .min_tls_version(reqwest::tls::Version::TLS_1_3)
         .build()

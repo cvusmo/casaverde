@@ -1,1 +1,2 @@
+# Default casaverde_server config.toml
 server = "https://10.0.0.6:3003"

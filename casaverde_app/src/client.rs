@@ -22,7 +22,8 @@ impl AppClient {
         let client = Client::builder()
             .use_rustls_tls()
             .min_tls_version(reqwest::tls::Version::TLS_1_3)
-            .danger_accept_invalid_certs(true) // For testing only
+            .danger_accept_invalid_certs(true) // FOR TESTING ONLY
+            .danger_accept_invalid_hostnames(true) // FOR TESTING ONLY
             .build()
             .expect("Failed to build secure client");
         Self {
