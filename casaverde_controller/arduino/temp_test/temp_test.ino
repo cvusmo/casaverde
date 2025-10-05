@@ -32,7 +32,7 @@ void loop() {
 
   // Temperature probe controls relay2
   if (probeTemp != DEVICE_DISCONNECTED_C) {
-    if (probeTemp > 15.0) {
+    if (probeTemp > 26.0) {
       digitalWrite(relay2, HIGH); // LED on
     } else {
       digitalWrite(relay2, LOW); // LED off
