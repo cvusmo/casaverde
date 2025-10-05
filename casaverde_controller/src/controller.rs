@@ -55,18 +55,22 @@ pub fn process_remote_readings(readings: &Value, controller_id: &str) -> Vec<Com
                                 devices_array
                                     .iter()
                                     .filter_map(|device| {
-                                        device
-                                            .as_object()
-                                            .and_then(|obj| {
-                                                let id = obj.get("id")?.as_str()?;
-                                                let value = obj.get("value")?.as_f64()?;
-                                                match id {
-                                                    "blackbeard-cpu" if value > 40.0 => Some(Command::TurnOnCooling),
-                                                    "blackbeard-probe" if value > 15.0 => Some(Command::TurnOnRelay2),
-                                                    "blackbeard-probe" if value <= 15.0 => Some(Command::TurnOffRelay2),
-                                                    _ => None,
+                                        device.as_object().and_then(|obj| {
+                                            let id = obj.get("id")?.as_str()?;
+                                            let value = obj.get("value")?.as_f64()?;
+                                            match id {
+                                                "blackbeard-cpu" if value > 40.0 => {
+                                                    Some(Command::TurnOnCooling)
                                                 }
-                                            })
+                                                "blackbeard-probe" if value > 15.0 => {
+                                                    Some(Command::TurnOnRelay2)
+                                                }
+                                                "blackbeard-probe" if value <= 15.0 => {
+                                                    Some(Command::TurnOffRelay2)
+                                                }
+                                                _ => None,
+                                            }
+                                        })
                                     })
                                     .collect::<Vec<_>>()
                             })
@@ -91,32 +95,4 @@ pub fn process_local_rules(_config: &crate::config::Config, local_temp: f64) -> 
     commands.push(Command::TurnOnSolar);
     commands.push(Command::TurnOnHumidity);
     commands
-}
-
-pub async fn run_light_timer(
-    _relay_id: String,
-    on_hours: u64,
-    off_hours: u64,
-    tx: tokio::sync::mpsc::Sender<Command>,
-) {
-    info!(
-        "Starting light timer with {}h ON / {}h OFF cycle",
-        on_hours, off_hours
-    );
-    let mut interval = interval(tokio::time::Duration::from_secs(15));
-    let mut is_on = true;
-
-    loop {
-        interval.tick().await;
-        let cmd = if is_on { Command::TurnOnSolar } else { Command::TurnOffSolar };
-        if tx.send(cmd).await.is_err() {
-            break;
-        }
-        info!(
-            "Toggled light to {} at {:?}",
-            if is_on { "ON" } else { "OFF" },
-            tokio::time::Instant::now()
-        );
-        is_on = !is_on;
-    }
 }

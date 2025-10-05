@@ -7,9 +7,10 @@ use log::{info, error};
 use std::sync::Arc;
 use tokio::{spawn, sync::mpsc, time::interval};
 use casaverde_controller::config;
-use casaverde_controller::controller::{Command, process_remote_readings, process_local_rules, run_light_timer};
+use casaverde_controller::controller::{Command, process_remote_readings, process_local_rules};
 use casaverde_controller::gpio;
 use casaverde_controller::serial::{init_serial, send_command, read_sensor_data};
+use casaverde_controller::timer::run_light_timer;
 use casaverde_utils;
 
 #[tokio::main]

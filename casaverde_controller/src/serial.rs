@@ -36,14 +36,14 @@ pub fn send_command(
     let command = match cmd {
         Command::TurnOnCooling => "SET FAN1 ON\n",
         Command::TurnOffCooling => "SET FAN1 OFF\n",
-        Command::TurnOnMoisture => "GET moisture-1\n",
-        Command::TurnOffMoisture => "GET moisture-1\n",
-        Command::OpenValve => "GET water-1\n",
-        Command::CloseValve => "GET water-1\n",
-        Command::TurnOnSolar => "GET solar-1\n",
-        Command::TurnOffSolar => "GET solar-1\n",
-        Command::TurnOnHumidity => "GET humidity-1\n",
-        Command::TurnOffHumidity => "GET humidity-1\n",
+        Command::TurnOnMoisture => "SET moisture-1 ON\n",
+        Command::TurnOffMoisture => "SET moisture-1 OFF\n",
+        Command::OpenValve => "SET water-1 OPEN\n",
+        Command::CloseValve => "SET water-1 CLOSE\n",
+        Command::TurnOnSolar => "SET solar-1 ON\n",
+        Command::TurnOffSolar => "SET solar-1 OFF\n",
+        Command::TurnOnHumidity => "SET humidity-1 ON\n",
+        Command::TurnOffHumidity => "SET humidity-1 OFF\n",
         Command::SetPWM(pwm) => &format!("SET FAN1 PWM_{pwm}\n"),
 
         Command::GetProbeTemp => "GET blackbeard-probe\n",
@@ -56,22 +56,22 @@ pub fn send_command(
 }
 
 pub fn read_sensor_data(port: &mut dyn serialport::SerialPort) -> Option<Vec<DeviceReading>> {
-    let mut buffer = [0u8; 128];
-    if port
-        .set_timeout(std::time::Duration::from_millis(500))
-        .is_ok()
-    {
-        if let Ok(n) = port.read(&mut buffer) {
-            if n > 0 {
-                let response = String::from_utf8_lossy(&buffer[..n]).trim().to_string();
-                info!("Received from simulator: {}", response);
-                let mut readings = Vec::new();
-                match_response(&response, &mut readings);
-                return Some(readings);
-            }
+    let mut buffer = Vec::new();
+    let mut temp = [0u8; 1];
+    let mut readings = Vec::new();
+    while port.read(&mut temp).ok()? > 0 {
+        buffer.push(temp[0]);
+        if temp[0] == b'\n' {
+            let line = String::from_utf8_lossy(&buffer).trim().to_string();
+            match_response(&line, &mut readings);
+            buffer.clear();
         }
     }
-    None
+    if !readings.is_empty() {
+        Some(readings)
+    } else {
+        None
+    }
 }
 
 fn match_response(response: &str, readings: &mut Vec<DeviceReading>) {
