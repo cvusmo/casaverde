@@ -5,6 +5,7 @@
 use crate::devices::{DeviceData, Sensor};
 use ratatui::backend::CrosstermBackend;
 use std::io;
+use log::{info, error};
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Screen {
@@ -22,50 +23,70 @@ pub struct CasaverdeApp {
 
 impl CasaverdeApp {
     pub fn new() -> Self {
-        Self {
+        let app = Self {
             sensor_data: DeviceData::new("config.toml"),
             selected: 0,
             quit: false,
             screen: Screen::Devices,
-        }
+        };
+        info!("CasaverdeApp initialized");
+        app
     }
 
     pub fn move_up(&mut self) {
         if self.screen == Screen::Devices && self.selected > 0 {
             self.selected -= 1;
+            info!("Moved selection up to index {}", self.selected);
         }
     }
 
     pub fn move_down(&mut self) {
         if self.screen == Screen::Devices && self.selected + 1 < self.sensor_data.active_count {
             self.selected += 1;
+            info!("Moved selection down to index {}", self.selected);
         }
     }
 
     pub fn quit(&mut self) {
         self.quit = true;
+        info!("Application quit triggered");
     }
 
     pub fn switch_screen(&mut self) {
         self.screen = match self.screen {
-            Screen::Devices => Screen::Monitoring,
-            Screen::Monitoring => Screen::Config,
-            Screen::Config => Screen::Devices,
+            Screen::Devices => {
+                info!("Switched to Monitoring screen");
+                Screen::Monitoring
+            }
+            Screen::Monitoring => {
+                info!("Switched to Config screen");
+                Screen::Config
+            }
+            Screen::Config => {
+                info!("Switched to Devices screen");
+                Screen::Devices
+            }
         };
     }
 
     pub fn toggle_selected_sensor(&mut self) {
         if self.screen == Screen::Devices {
-            let sensor = match self.sensor_data.config.configs[self.selected].id.as_str() {
-                "blackbeard-cpu" => Sensor::Temperature,
-                "solar-1" => Sensor::Solar,
-                "moisture-1" => Sensor::Moisture,
-                "humidity-1" => Sensor::Humidity,
-                "water-1" => Sensor::Water,
-                "blackbeard-probe" => Sensor::Probe,
-                _ => return,
-            };
-            self.sensor_data.toggle_sensor(sensor);
+            if let Some(sensor) = self.sensor_data.config.configs.get(self.selected).and_then(|cfg| {
+                match cfg.id.as_str() {
+                    "blackbeard-cpu" => Some(Sensor::Temperature),
+                    "solar-1" => Some(Sensor::Solar),
+                    "moisture-1" => Some(Sensor::Moisture),
+                    "humidity-1" => Some(Sensor::Humidity),
+                    "water-1" => Some(Sensor::Water),
+                    "blackbeard-probe" => Some(Sensor::Probe),
+                    _ => None,
+                }
+            }) {
+                self.sensor_data.toggle_sensor(sensor);
+                info!("Toggled sensor: {}", sensor.name());
+            } else {
+                error!("Failed to toggle sensor at index {}", self.selected);
+            }
         }
     }
 }
@@ -75,13 +96,23 @@ pub async fn run_app(
     mut app: CasaverdeApp,
 ) -> io::Result<()> {
     use crate::tui::{handle_tui_events, render_tui};
+
     loop {
         if app.quit {
+            info!("Exiting run loop");
             break;
         }
+
         app.sensor_data.update_devices().await;
-        render_tui(terminal, &app)?;
-        handle_tui_events(&mut app)?;
+
+        if let Err(e) = render_tui(terminal, &app) {
+            error!("Error rendering TUI: {:?}", e);
+        }
+
+        if let Err(e) = handle_tui_events(&mut app) {
+            error!("Error handling TUI events: {:?}", e);
+        }
     }
     Ok(())
 }
+

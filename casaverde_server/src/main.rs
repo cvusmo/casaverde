@@ -2,97 +2,59 @@
 // github.com/cvusmo/casaverde/casaverde_server
 // src/main.rs
 
-use axum::{
-    Router,
-    routing::{get, post},
-};
+use axum::{Router, routing::{get, post}};
 use axum_server::tls_rustls::RustlsConfig;
-use dirs::config_dir;
-use log::info;
-use std::net::SocketAddr;
-use std::{fs, io};
-use toml::Value;
 use casaverde_server::handlers;
 use casaverde_utils;
+use std::{fs, io, net::SocketAddr};
+use dirs::config_dir;
+use tokio::time::Duration;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
     casaverde_utils::init_logger("casaverde_server", log::LevelFilter::Info)?;
-    info!("Starting casaverde_server");
+    let addr = server_addr()?;
 
-    let addr = get_server_addr()?;
+    let mut cfg_dir = config_dir().ok_or(io::Error::new(io::ErrorKind::NotFound, "Config directory not found"))?;
+    cfg_dir.push("casaverde_server");
+    fs::create_dir_all(&cfg_dir)?;
 
-    let mut config_dir = config_dir()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Config directory not found"))?;
-    config_dir.push("casaverde_server");
+    let crt = cfg_dir.join("server.crt");
+    let key = cfg_dir.join("server.key");
+    if !crt.exists() || !key.exists() { return Err(io::Error::new(io::ErrorKind::NotFound, "Certificates missing")) }
+    let tls = RustlsConfig::from_pem_file(&crt, &key).await?;
 
-    fs::create_dir_all(&config_dir)?;
-
-    let mut cert_path = config_dir.clone();
-    cert_path.push("server.crt");
-    let mut key_path = config_dir.clone();
-    key_path.push("server.key");
-
-    if !cert_path.exists() || !key_path.exists() {
-        eprintln!("Error: Certificates not found in {}", config_dir.display());
-        eprintln!("Generate them by running './build.sh' in the project directory");
-        return Err(io::Error::new(
-            io::ErrorKind::NotFound,
-            "Certificate or key file missing",
-        ));
-    }
-
-    let config = RustlsConfig::from_pem_file(&cert_path, &key_path).await?;
-    info!("Server running on https://{addr}");
+    tokio::spawn(async {
+        loop {
+            tokio::time::sleep(Duration::from_secs(600)).await;
+            casaverde_server::cache::clean_temp(Duration::from_secs(3600)).await;
+        }
+    });
 
     let app = Router::new()
         .route("/temps", get(handlers::get_temperatures))
-        .route(
-            "/sensor_data",
-            get(handlers::get_all_data).post(handlers::post_sensor_data),
-        )
-        .route(
-            "/commands",
-            get(handlers::get_commands).post(handlers::post_commands),
-        )
+        .route("/sensor_data", get(handlers::get_all_data).post(handlers::post_sensor_data))
+        .route("/commands", get(handlers::get_commands).post(handlers::post_commands))
         .route("/configs/{controller_id}", get(handlers::get_configs))
         .route("/configs", post(handlers::post_configs));
 
-    axum_server::bind_rustls(addr, config)
-        .serve(app.into_make_service())
-        .await?;
-
+    axum_server::bind_rustls(addr, tls).serve(app.into_make_service()).await?;
     Ok(())
 }
 
-fn get_server_addr() -> io::Result<SocketAddr> {
-    let mut config_path = config_dir()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Config directory not found"))?;
-    config_path.push("casaverde_server/config.toml");
+fn server_addr() -> io::Result<SocketAddr> {
+    let mut cfg = config_dir()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Config dir missing"))?;
+    cfg.push("casaverde_server/config.toml");
 
-    let config_str = fs::read_to_string(&config_path).map_err(|e| {
-        io::Error::new(
-            io::ErrorKind::Other,
-            format!("Failed to read config.toml: {}", e),
-        )
-    })?;
+    let content = fs::read_to_string(&cfg)?;
 
-    let config: Value = toml::from_str(&config_str).map_err(|e| {
-        io::Error::new(
-            io::ErrorKind::Other,
-            format!("Failed to parse config.toml: {}", e),
-        )
-    })?;
+    let val: toml::Value = toml::from_str(&content)
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to parse TOML: {}", e)))?;
 
-    let server_ip = config
-        .get("server")
+    let ip = val.get("server")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Server address not found in config.toml"))?;
+        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Server IP missing"))?;
 
-    server_ip.parse().map_err(|e| {
-        io::Error::new(
-            io::ErrorKind::Other,
-            format!("Invalid server address format in config.toml: {}", e),
-        )
-    })
+    ip.parse().map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Invalid IP: {}", e)))
 }

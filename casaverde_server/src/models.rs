@@ -4,37 +4,27 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeviceReading {
     pub id: String,
     pub value: Option<f32>,
 }
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SensorReading {
     pub client_id: String,
     pub devices: Vec<DeviceReading>,
 }
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Command {
     pub action: String,
     pub device_id: String,
 }
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandPayload {
     pub controller_id: String,
     pub commands: Vec<Command>,
 }
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ConfigEntry {
-    pub current: ConfigData,
-    pub backup: Option<ConfigData>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigData {
     pub server: String,
     pub controller_id: String,
@@ -43,8 +33,12 @@ pub struct ConfigData {
     pub light_on_hours: u64,
     pub light_off_hours: u64,
 }
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigEntry {
+    pub current: ConfigData,
+    pub backup: Option<ConfigData>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigPayload {
     pub controller_id: String,
     pub config: ConfigData,

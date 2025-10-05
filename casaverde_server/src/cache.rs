@@ -3,72 +3,65 @@
 // src/cache.rs
 
 use crate::models::{Command, ConfigData, ConfigEntry, DeviceReading, SensorReading};
-use log::info;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use tokio::time::Instant;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use tokio::time::{Instant, Duration};
 
 type TempCacheValue = (Vec<DeviceReading>, Instant);
 type CommandCacheValue = (Vec<Command>, Instant);
-type ConfigCacheValue = ConfigEntry;
 
 lazy_static::lazy_static! {
-    static ref TEMP_CACHE: Arc<Mutex<HashMap<String, TempCacheValue>>> = Arc::new(Mutex::new(HashMap::new()));
-    static ref COMMAND_CACHE: Arc<Mutex<HashMap<String, CommandCacheValue>>> = Arc::new(Mutex::new(HashMap::new()));
-    static ref CONFIG_CACHE: Arc<Mutex<HashMap<String, ConfigCacheValue>>> = Arc::new(Mutex::new(HashMap::new()));
+    static ref TEMP_CACHE: Arc<RwLock<HashMap<String, TempCacheValue>>> = Arc::new(RwLock::new(HashMap::new()));
+    static ref COMMAND_CACHE: Arc<RwLock<HashMap<String, CommandCacheValue>>> = Arc::new(RwLock::new(HashMap::new()));
+    static ref CONFIG_CACHE: Arc<RwLock<HashMap<String, ConfigEntry>>> = Arc::new(RwLock::new(HashMap::new()));
 }
 
-pub fn get_temp_cache() -> Arc<Mutex<HashMap<String, TempCacheValue>>> {
-    TEMP_CACHE.clone()
-}
+pub fn temp_cache() -> Arc<RwLock<HashMap<String, TempCacheValue>>> { TEMP_CACHE.clone() }
+pub fn command_cache() -> Arc<RwLock<HashMap<String, CommandCacheValue>>> { COMMAND_CACHE.clone() }
+pub fn config_cache() -> Arc<RwLock<HashMap<String, ConfigEntry>>> { CONFIG_CACHE.clone() }
 
-pub fn get_command_cache() -> Arc<Mutex<HashMap<String, CommandCacheValue>>> {
-    COMMAND_CACHE.clone()
-}
-
-pub fn get_config_cache() -> Arc<Mutex<HashMap<String, ConfigCacheValue>>> {
-    CONFIG_CACHE.clone()
-}
-
-pub fn insert_temp_cache(client_id: String, data: SensorReading) {
-    let mut cache = TEMP_CACHE.lock().unwrap();
+pub async fn insert_temp(client_id: String, data: SensorReading) {
+    let mut cache = TEMP_CACHE.write().await;
     let timestamp = Instant::now();
-    cache.insert(client_id.clone(), (data.devices, timestamp));
-    info!(
-        "Inserted temperature data for client {} into cache",
-        client_id
-    );
+    cache.entry(client_id.clone())
+        .and_modify(|(existing, _)| {
+            for d in &data.devices {
+                match existing.iter_mut().find(|e| e.id == d.id) {
+                    Some(e) => *e = d.clone(),
+                    None => existing.push(d.clone()),
+                }
+            }
+        })
+        .or_insert((data.devices, timestamp));
 }
 
-pub fn insert_command_cache(controller_id: String, commands: Vec<Command>) {
-    let mut cache = COMMAND_CACHE.lock().unwrap();
-    let timestamp = Instant::now();
-    cache.insert(controller_id.clone(), (commands, timestamp));
-    info!(
-        "Inserted command data for controller {} into cache",
-        controller_id
-    );
+pub async fn insert_command(controller_id: String, commands: Vec<Command>) {
+    let mut cache = COMMAND_CACHE.write().await;
+    cache.insert(controller_id, (commands, Instant::now()));
 }
 
-pub fn insert_config_cache(controller_id: String, new_config: ConfigData, revert: bool) {
-    let mut cache = CONFIG_CACHE.lock().unwrap();
+pub async fn insert_config(controller_id: String, config: ConfigData, revert: bool) {
+    let mut cache = CONFIG_CACHE.write().await;
     if revert {
         if let Some(entry) = cache.get_mut(&controller_id) {
             if let Some(backup) = entry.backup.take() {
                 entry.backup = Some(entry.current.clone());
                 entry.current = backup;
-                info!("Reverted config for {}", controller_id);
             }
         }
     } else {
-        let entry = cache
-            .entry(controller_id.clone())
-            .or_insert_with(|| ConfigEntry {
-                current: new_config.clone(),
-                backup: None,
-            });
+        let entry = cache.entry(controller_id).or_insert_with(|| ConfigEntry {
+            current: config.clone(),
+            backup: None,
+        });
         entry.backup.get_or_insert(entry.current.clone());
-        entry.current = new_config;
-        info!("Updated config for {}", controller_id);
+        entry.current = config;
     }
+}
+
+pub async fn clean_temp(ttl: Duration) {
+    let mut cache = TEMP_CACHE.write().await;
+    let now = Instant::now();
+    cache.retain(|_, (_, ts)| now.duration_since(*ts) < ttl);
 }

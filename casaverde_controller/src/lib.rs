@@ -7,5 +7,6 @@ pub mod config;
 pub mod controller;
 pub mod gpio;
 pub mod models;
+pub mod sensors;
 pub mod serial;
 pub mod timer;

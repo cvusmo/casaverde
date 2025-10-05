@@ -2,39 +2,36 @@
 // github.com/cvusmo/casaverde/casaverde_server
 // src/handlers.rs
 
-use crate::models::ConfigData;
 use axum::{response::Json, extract::Json as AxumJson, extract::Path};
-use crate::models::{ConfigEntry, ConfigPayload, DeviceReading, SensorReading, Command, CommandPayload};
-use crate::cache::{get_config_cache, insert_config_cache, get_temp_cache, insert_temp_cache, get_command_cache, insert_command_cache};
-use log::info;
+use crate::models::{SensorReading, Command, CommandPayload, ConfigPayload, ConfigData, ConfigEntry, DeviceReading};
+use crate::cache::{temp_cache, command_cache, config_cache, insert_temp, insert_command, insert_config};
 
 pub async fn get_temperatures() -> Json<Vec<(String, Vec<DeviceReading>)>> {
-    let cache = get_temp_cache();
-    let cache_data = cache.lock().unwrap();
-    Json(
-        cache_data
-            .iter()
-            .map(|(id, (data, _))| (id.clone(), data.clone()))
-            .collect()
-    )
+    let cache_ref = temp_cache();
+    let cache = cache_ref.read().await;
+    let result = cache.iter()
+        .map(|(id, (data, _))| (id.clone(), data.clone()))
+        .collect();
+    Json(result)
 }
 
 pub async fn get_all_data() -> Json<Vec<(String, Vec<DeviceReading>)>> {
-    let cache = get_temp_cache();
-    let cache_data = cache.lock().unwrap();
-    Json(cache_data.iter().map(|(id, (data, _))| (id.clone(), data.clone())).collect())
+    get_temperatures().await
 }
 
 pub async fn get_commands() -> Json<Vec<(String, Vec<Command>)>> {
-    let cache = get_command_cache();
-    let cache_data = cache.lock().unwrap();
-    Json(cache_data.iter().map(|(id, (commands, _))| (id.clone(), commands.clone())).collect())
+    let cache_ref = command_cache();
+    let cache = cache_ref.read().await;
+    let result = cache.iter()
+        .map(|(id, (cmds, _))| (id.clone(), cmds.clone()))
+        .collect();
+    Json(result)
 }
 
 pub async fn get_configs(Path(controller_id): Path<String>) -> Json<ConfigEntry> {
-    let cache = get_config_cache();
-    let cache_data = cache.lock().unwrap();
-    Json(cache_data.get(&controller_id).cloned().unwrap_or(ConfigEntry {
+    let cache_ref = config_cache();
+    let cache = cache_ref.read().await;
+    let entry = cache.get(&controller_id).cloned().unwrap_or(ConfigEntry {
         current: ConfigData {
             server: "".to_string(),
             controller_id: "".to_string(),
@@ -44,20 +41,28 @@ pub async fn get_configs(Path(controller_id): Path<String>) -> Json<ConfigEntry>
             light_off_hours: 0,
         },
         backup: None,
-    }))
-}
-
-
-pub async fn post_commands(AxumJson(data): AxumJson<CommandPayload>) {
-    info!("Received POST commands: controller_id={}, commands={:?}", data.controller_id, data.commands);
-    insert_command_cache(data.controller_id.clone(), data.commands);
-}
-
-pub async fn post_configs(AxumJson(payload): AxumJson<ConfigPayload>) {
-    insert_config_cache(payload.controller_id.clone(), payload.config, payload.revert);
+    });
+    Json(entry)
 }
 
 pub async fn post_sensor_data(AxumJson(data): AxumJson<SensorReading>) {
-    info!("Received POST data: client_id={}, devices={:?}", data.client_id, data.devices);
-    insert_temp_cache(data.client_id.clone(), data);
+    let client_id = data.client_id.clone(); 
+    if !client_id.is_empty() {
+        insert_temp(client_id, data).await;
+    }
 }
+
+pub async fn post_commands(AxumJson(payload): AxumJson<CommandPayload>) {
+    let controller_id = payload.controller_id.clone();
+    if !controller_id.is_empty() {
+        insert_command(controller_id, payload.commands).await;
+    }
+}
+
+pub async fn post_configs(AxumJson(payload): AxumJson<ConfigPayload>) {
+    let controller_id = payload.controller_id.clone();
+    if !controller_id.is_empty() {
+        insert_config(controller_id, payload.config, payload.revert).await;
+    }
+}
+

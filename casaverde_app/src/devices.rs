@@ -2,19 +2,18 @@
 // github.com/cvusmo/casaverde/casaverde_app
 // src/devices.rs
 
-use crate::{client::AppClient, models::{ConfigEntry}};
+use crate::{client::AppClient, models::ConfigEntry};
 use log::{error, info};
 use serde::{Deserialize, Serialize};
-use tokio::time::Duration;
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum Sensor {
-    Solar,
-    Temperature,
-    Moisture,
-    Humidity,
-    Water,
-    Probe,
+    Solar = 0,
+    Temperature = 1,
+    Moisture = 2,
+    Humidity = 3,
+    Water = 4,
+    Probe = 5,
 }
 
 impl Sensor {
@@ -30,11 +29,10 @@ impl Sensor {
     pub fn name(self) -> &'static str {
         match self {
             Sensor::Solar => "Solar Sensor",
-            Sensor::Temperature => "Temperature Sensor",
+            Sensor::Temperature => "CPU Temperature",
             Sensor::Moisture => "Moisture Sensor",
             Sensor::Humidity => "Humidity Sensor",
             Sensor::Water => "Water Sensor",
-
             Sensor::Probe => "Probe Temperature",
         }
     }
@@ -46,7 +44,6 @@ impl Sensor {
             Sensor::Moisture => "moisture-1",
             Sensor::Humidity => "humidity-1",
             Sensor::Water => "water-1",
-
             Sensor::Probe => "blackbeard-probe",
         }
     }
@@ -73,35 +70,23 @@ pub struct TempData {
     pub probe: Option<f32>,
 }
 
-#[derive(Serialize)]
-pub struct SensorReading {
-    pub client_id: String,
-    pub devices: Vec<DeviceReading>,
-}
-
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct DeviceReading {
     pub id: String,
     pub value: Option<f32>,
 }
 
-#[derive(Deserialize, Serialize, Clone)]
-pub struct AppCommand {
-    pub action: String,
-    pub device_id: String,
-}
-
-#[derive(Deserialize, Serialize, Clone)]
-pub struct CommandPayload {
-    pub controller_id: String,
-    pub commands: Vec<AppCommand>,
+#[derive(Serialize, Deserialize, Clone)]
+pub struct SensorReading {
+    pub client_id: String,
+    pub devices: Vec<DeviceReading>,
 }
 
 #[derive(Clone)]
 pub struct DeviceData {
     pub states: [bool; Sensor::ALL.len()],
     pub temp_data: TempData,
-    pub device_values: Vec<Option<f32>>,
+    pub device_values: [Option<f32>; 10],
     pub client: AppClient,
     pub config: DeviceConfigRoot,
     pub active_count: usize,
@@ -109,34 +94,20 @@ pub struct DeviceData {
 
 impl DeviceData {
     pub fn new(config_path: &str) -> Self {
-        let config_path = if config_path.is_empty() {
-            "/home/echo/.config/casaverde_app/config.toml".to_string()
-        } else {
-            config_path.to_string()
-        };
-        let config_str = match std::fs::read_to_string(&config_path) {
-            Ok(c) => c,
-            Err(e) => {
-                error!("Failed to read config file {config_path}: {e}");
-                panic!("Config read failed");
-            }
-        };
-        let mut config: DeviceConfigRoot = match toml::from_str(&config_str) {
-            Ok(c) => c,
-            Err(e) => {
-                error!("Invalid TOML config in {config_path}: {e}");
-                panic!("Config parse failed");
-            }
-        };
+        let config_str = std::fs::read_to_string(config_path)
+            .unwrap_or_else(|e| panic!("Failed to read config: {e}"));
 
-        let device_count = config.configs.len().min(16);
+        let mut config: DeviceConfigRoot = toml::from_str(&config_str)
+            .unwrap_or_else(|e| panic!("Failed to parse config: {e}"));
+
+        let device_count = config.configs.len().min(10);
         config.configs.truncate(device_count);
 
-        let client_id = "blackbeard-pi".to_string(); // Match controller's client ID
+        let client_id = "blackbeard-pi".to_string();
         let client = AppClient::new(&config.server, client_id.clone());
 
         let states = [true; Sensor::ALL.len()];
-        let device_values = vec![None; device_count];
+        let device_values = [None; 10];
 
         info!("DeviceData initialized with {device_count} devices");
         Self {
@@ -150,88 +121,46 @@ impl DeviceData {
     }
 
     pub async fn update_devices(&mut self) {
-        let url = format!("{}/temps", self.config.server);
+        let url = format!("{}/sensor_data", self.config.server);
         match self.client.client.get(&url).send().await {
-            Ok(resp) => {
-                if let Ok(readings) = resp.json::<Vec<(String, Vec<DeviceReading>)>>().await {
-                    let mut devices = Vec::new();
-                    let configs = self.config.configs.clone();
+            Ok(resp) => match resp.json::<Vec<SensorReading>>().await {
+                Ok(sensor_payload) => {
+                    for i in 0..self.active_count {
+                        let cfg = &self.config.configs[i];
+                        let sensor_opt = Sensor::ALL.iter().find(|s| s.device_id() == cfg.id).copied();
 
-                    for (i, config) in configs.iter().enumerate() {
-                        let sensor = match config.id.as_str() {
-                            "blackbeard-cpu" => Some(Sensor::Temperature),
-                            "solar-1" => Some(Sensor::Solar),
-                            "moisture-1" => Some(Sensor::Moisture),
-                            "humidity-1" => Some(Sensor::Humidity),
-                            "water-1" => Some(Sensor::Water),
-                            "blackbeard-probe" => Some(Sensor::Probe),
-                            _ => None,
-                        };
-
-                        let value = readings
+                        let value = sensor_payload
                             .iter()
-                            .find(|(client_id, _)| client_id == &self.client.client_id)
-                            .or_else(|| readings.iter().find(|(client_id, _)| client_id == "blackbeard-pi"))
-                            .and_then(|(_, devs)| devs.iter().find(|d| d.id == config.id))
+                            .filter(|r| r.client_id == self.client.client_id || r.client_id == "blackbeard-pi")
+                            .flat_map(|r| r.devices.iter())
+                            .find(|d| d.id == cfg.id)
                             .and_then(|d| d.value);
 
-                        if let Some(sensor) = sensor {
-                            if self.states[sensor as usize] {
-                                self.device_values[i] = value;
-                                if config.id == "blackbeard-cpu" {
-                                    self.temp_data.cpu = value;
-                                }
-                                if config.id == "blackbeard-probe" {
-                                    self.temp_data.probe = value;
-                                }
-                                devices.push(DeviceReading {
-                                    id: config.id.clone(),
-                                    value,
-                                });
-                            } else {
-                                self.device_values[i] = None;
-                                if config.id == "blackbeard-cpu" {
-                                    self.temp_data.cpu = None;
-                                }
-                                if config.id == "blackbeard-probe" {
-                                    self.temp_data.probe = None;
-                                }
-                            }
-                        } else if config.id == "relay-1" {
-                            self.device_values[i] = value;
-                            devices.push(DeviceReading {
-                                id: config.id.clone(),
-                                value,
-                            });
+                        self.device_values[i] = sensor_opt.map_or(value, |s| {
+                            if self.states[s as usize] { value } else { None }
+                        });
+
+                        if cfg.id == "blackbeard-cpu" {
+                            self.temp_data.cpu = self.device_values[i];
+                        }
+                        if cfg.id == "blackbeard-probe" {
+                            self.temp_data.probe = self.device_values[i];
                         }
                     }
-
-                    if self.client.last_updated.elapsed() >= Duration::from_secs(5) {
-                        let reading = SensorReading {
-                            client_id: self.client.client_id.clone(),
-                            devices,
-                        };
-                        self.client.send_sensor_data(reading, "sensor_data").await;
-                    }
-                } else {
-                    error!("Failed to parse sensor data from server");
                 }
-            }
-            Err(e) => {
-                error!("Failed to fetch sensor data from {}: {}", url, e);
-            }
+                Err(e) => error!("Failed to parse sensor data: {:?}", e),
+            },
+            Err(_) => error!("Failed to fetch sensor data from {}", url),
         }
     }
 
     pub fn toggle_sensor(&mut self, sensor: Sensor) {
-        let index = sensor as usize;
-        if index < self.states.len() {
-            self.states[index] = !self.states[index];
-            info!("Toggled {} to {}", sensor.name(), self.states[index]);
-        }
+        self.states[sensor as usize] = !self.states[sensor as usize];
+        info!("Toggled {} to {}", sensor.name(), self.states[sensor as usize]);
     }
 
     pub async fn fetch_controller_config(&self, controller_id: &str) -> Option<ConfigEntry> {
         self.client.fetch_controller_config(controller_id).await
     }
 }
+
