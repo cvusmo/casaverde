@@ -4,7 +4,7 @@
 
 use crate::devices::DeviceData;
 use casaverde_sim::sim::{run_simulation, Cell};
-use casaverde_utils::log::{info, warn, error};
+use casaverde_utils::log::error;
 use crossterm::event::{self, Event, KeyCode};
 use std::io;
 use std::time::{Duration, Instant};
