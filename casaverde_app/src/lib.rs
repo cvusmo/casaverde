@@ -6,6 +6,5 @@ pub mod app;
 pub mod client;
 pub mod devices;
 pub mod models;
-pub mod touch;
 pub mod tui;
 pub mod ui;

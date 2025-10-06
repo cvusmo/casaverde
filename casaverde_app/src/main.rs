@@ -2,7 +2,6 @@
 // github.com/cvusmo/casaverde/casaverde_app
 
 use casaverde_app::app::{run_app, App};
-use casaverde_app::touch::run_touchscreen;
 use casaverde_app::tui::Tui;
 use casaverde_utils::dirs::get_home_dir;
 use casaverde_utils::fs::read_to_string;
@@ -14,8 +13,6 @@ use toml::Value;
 
 #[derive(Parser)]
 struct Args {
-    #[arg(long, default_value_t = false)]
-    tui: bool,
     #[arg(long, default_value = "https://127.0.0.1:3003")]
     server: String,
 }
@@ -44,11 +41,7 @@ async fn main() -> Result<(), IoError> {
         .map(|ip| format!("https://{ip}"))
         .unwrap_or(args.server);
 
-    if args.tui {
-        run_tui_mode(&server, &config_path).await
-    } else {
-        run_touchscreen().await.map_err(|e| new_error(IoErrorKind::Other, format!("Touchscreen error: {}", e)))
-    }
+    run_tui_mode(&server, &config_path).await
 }
 
 async fn run_tui_mode(server: &str, config_path: &PathBuf) -> Result<(), IoError> {
