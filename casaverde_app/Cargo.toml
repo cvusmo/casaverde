@@ -1,4 +1,6 @@
-# casaverde_app/Cargo.toml
+// Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
+// github.com/cvusmo/casaverde/casaverde_app
+// Config.toml - 
 
 [package]
 name = "casaverde_app"
@@ -22,6 +24,7 @@ serialport.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 toml.workspace = true
+twox-hash.workspace = true
 uuid.workspace = true
 casaverde_utils = { path = "../casaverde_utils" }
 

@@ -1,4 +1,7 @@
-// casaverde_utils/src/lib.rs
+// Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
+// github.com/cvusmo/casaverde/casaverde_utils
+// lib.rs -
+
 use env_logger::{Builder, Target};
 use log::LevelFilter;
 use std::io::Write;
