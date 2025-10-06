@@ -68,6 +68,9 @@ pub fn process_remote_readings(readings: &Value, controller_id: &str) -> Vec<Com
                                                 "blackbeard-cpu" if value > 40.0 => {
                                                     Some(Command::TurnOnCooling)
                                                 }
+                                                "blackbeard_cpu" if value < 40.0 => {
+                                                    Some(Command::TurnOffCooling)
+                                                }
                                                 "blackbeard-probe" if value > 15.0 => {
                                                     Some(Command::TurnOnRelay2)
                                                 }
@@ -115,8 +118,10 @@ pub fn process_remote_readings(readings: &Value, controller_id: &str) -> Vec<Com
 
 pub fn process_local_rules(_config: &crate::config::Config, local_temp: f64) -> Vec<Command> {
     let mut commands = Vec::new();
-    if local_temp > 35.0 {
+    if local_temp > 40.0 {
         commands.push(Command::TurnOnCooling);
+    } else if local_temp < 40.0 {
+        commands.push(Command::TurnOffCooling);
     }
     // Periodic queries for all sensors
     commands.push(Command::GetProbeTemp);

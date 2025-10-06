@@ -1,0 +1,14 @@
+[package]
+name = "casaverde_time"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[dependencies]
+tokio.workspace = true
+chrono.workspace = true
+
+[lib]
+name = "casaverde_time"
+path = "src/lib.rs"
+

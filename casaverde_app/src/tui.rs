@@ -1,206 +1,71 @@
-// Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
-// github.com/cvusmo/casaverde/casaverde_app
-// src/tui.rs
-
-use crate::{
-    app::{CasaverdeApp, Screen},
-    devices::Sensor,
-    ui::create_layout,
+use crate::devices::Device;
+use crossterm::{
+    event, execute,
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use crossterm::event::{self, Event, KeyCode};
 use ratatui::{
-    style::{Color, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
+    Frame, Terminal,
+    backend::{Backend, CrosstermBackend},
+    layout::{Constraint, Direction, Layout},
+    style::{Color, Modifier, Style},
+    text::Span,
+    widgets::{Block, Borders, List, ListItem},
 };
-use std::io;
+use std::io::{self, Stdout};
 
-pub fn render_tui(
-    terminal: &mut ratatui::Terminal<ratatui::backend::CrosstermBackend<std::io::Stdout>>,
-    app: &CasaverdeApp,
-) -> io::Result<()> {
-    terminal.draw(|frame| {
-        let chunks = create_layout(frame.area());
-
-        let title = Paragraph::new("Casaverde")
-            .block(Block::new().borders(Borders::ALL))
-            .style(Style::default().fg(Color::Green))
-            .alignment(ratatui::layout::Alignment::Center);
-        frame.render_widget(title, chunks[0]);
-
-        match app.screen {
-            Screen::Devices => {
-                let mut items = Vec::with_capacity(app.sensor_data.active_count);
-                for i in 0..app.sensor_data.active_count {
-                    let cfg = &app.sensor_data.config.configs[i];
-                    let value = app.sensor_data.device_values[i];
-
-                    let sensor = match cfg.id.as_str() {
-                        "blackbeard-cpu" => Some(Sensor::Temperature),
-                        "solar-1" => Some(Sensor::Solar),
-                        "moisture-1" => Some(Sensor::Moisture),
-                        "humidity-1" => Some(Sensor::Humidity),
-                        "water-1" => Some(Sensor::Water),
-                        "blackbeard-probe" => Some(Sensor::Probe),
-                        _ => None,
-                    };
-
-                    let flag = if sensor.map_or(false, |s| app.sensor_data.states[s as usize]) {
-                        "[ON]  "
-                    } else {
-                        "[OFF] "
-                    };
-
-                    let value_str = match (sensor, value) {
-                        (Some(Sensor::Temperature), Some(v)) => format!("{v:.1}°C"),
-                        (Some(Sensor::Solar), Some(v)) => format!("{v:.1}W"),
-                        (Some(Sensor::Moisture), Some(v)) => format!("{v:.1}%"),
-                        (Some(Sensor::Humidity), Some(v)) => format!("{v:.1}%"),
-                        (Some(Sensor::Water), Some(v)) => format!("{v:.1}%"),
-                        (Some(Sensor::Probe), Some(v)) => format!("{v:.1}°C"),
-                        (Some(_), None) => "N/A".to_string(),
-                        (None, Some(v)) => format!("{v:.1}"),
-                        _ => "N/A".to_string(),
-                    };
-
-                    items.push(ListItem::new(Span::raw(format!(
-                        "{flag} {}: {value_str}",
-                        sensor.map_or(cfg.id.as_str(), |s| s.name())
-                    ))));
-                }
-
-                let mut list_state = ListState::default();
-                list_state.select(Some(app.selected.min(items.len().saturating_sub(1))));
-
-                let devices = List::new(items)
-                    .block(
-                        Block::new()
-                            .borders(Borders::ALL)
-                            .title("Devices")
-                            .title_alignment(ratatui::layout::Alignment::Center)
-                            .style(Style::default().fg(Color::Yellow)),
-                    )
-                    .highlight_symbol(">> ")
-                    .highlight_style(Style::default().bg(Color::DarkGray));
-
-                frame.render_stateful_widget(devices, chunks[1], &mut list_state);
-            }
-
-            Screen::Monitoring => {
-                let mut monitor_lines = Vec::with_capacity(app.sensor_data.active_count);
-                for i in 0..app.sensor_data.active_count {
-                    let cfg = &app.sensor_data.config.configs[i];
-                    let value = app.sensor_data.device_values[i];
-
-                    let sensor = match cfg.id.as_str() {
-                        "blackbeard-cpu" => Some(Sensor::Temperature),
-                        "solar-1" => Some(Sensor::Solar),
-                        "moisture-1" => Some(Sensor::Moisture),
-                        "humidity-1" => Some(Sensor::Humidity),
-                        "water-1" => Some(Sensor::Water),
-                        "blackbeard-probe" => Some(Sensor::Probe),
-                        _ => None,
-                    };
-
-                    let value_str = match (sensor, value) {
-                        (Some(Sensor::Temperature), Some(v)) => format!("{v:.1}°C"),
-                        (Some(Sensor::Solar), Some(v)) => format!("{v:.1}W"),
-                        (Some(Sensor::Moisture), Some(v)) => format!("{v:.1}%"),
-                        (Some(Sensor::Humidity), Some(v)) => format!("{v:.1}%"),
-                        (Some(Sensor::Water), Some(v)) => format!("{v:.1}%"),
-                        (Some(Sensor::Probe), Some(v)) => format!("{v:.1}°C"),
-                        (Some(_), None) => "N/A".to_string(),
-                        (None, Some(v)) => format!("{v:.1}"),
-                        _ => "N/A".to_string(),
-                    };
-
-                    monitor_lines.push(
-                        Line::from(format!(
-                            "{}: {}",
-                            sensor.map_or(cfg.id.as_str(), |s| s.name()),
-                            value_str
-                        ))
-                        .centered(),
-                    );
-                }
-
-                if monitor_lines.is_empty() {
-                    monitor_lines.push(Line::from("No devices configured").centered());
-                }
-
-                let monitor = Paragraph::new(monitor_lines)
-                    .block(
-                        Block::new()
-                            .borders(Borders::ALL)
-                            .title("Monitoring")
-                            .title_alignment(ratatui::layout::Alignment::Center)
-                            .style(Style::default().fg(Color::Yellow)),
-                    )
-                    .alignment(ratatui::layout::Alignment::Center);
-
-                frame.render_widget(monitor, chunks[1]);
-            }
-
-            Screen::Config => {
-                let mut config_lines = vec![Line::from("Configuration").centered()];
-                for cfg in &app.sensor_data.config.configs {
-                    config_lines.push(
-                        Line::from(format!(
-                            "{}: type={}, endpoint={}, interval={}s, serial_port={}",
-                            cfg.id, cfg.r#type, cfg.endpoint, cfg.interval, cfg.serial_port
-                        ))
-                        .centered(),
-                    );
-                }
-                config_lines.push(
-                    Line::from(format!("Server: {}", app.sensor_data.config.server)).centered(),
-                );
-
-                let config_paragraph = Paragraph::new(config_lines)
-                    .block(
-                        Block::new()
-                            .borders(Borders::ALL)
-                            .title("Configuration")
-                            .title_alignment(ratatui::layout::Alignment::Center)
-                            .style(Style::default().fg(Color::Yellow)),
-                    )
-                    .alignment(ratatui::layout::Alignment::Center);
-
-                frame.render_widget(config_paragraph, chunks[1]);
-            }
-        }
-
-        let status_text = match app.screen {
-            Screen::Devices => {
-                "Navigate with Up/Down, Toggle with Enter, Switch with m/c, Quit with q"
-            }
-            Screen::Monitoring => "Switch to Devices with s, Config with c, Quit with q",
-            Screen::Config => "Switch to Devices with s, Monitoring with m, Quit with q",
-        };
-        let status = Paragraph::new(status_text)
-            .block(Block::new().borders(Borders::ALL))
-            .style(Style::default().fg(Color::Cyan))
-            .alignment(ratatui::layout::Alignment::Center);
-
-        frame.render_widget(status, chunks[2]);
-    })?;
-    Ok(())
+pub struct Tui {
+    terminal: Terminal<CrosstermBackend<Stdout>>,
 }
 
-pub fn handle_tui_events(app: &mut CasaverdeApp) -> io::Result<()> {
-    if event::poll(std::time::Duration::from_millis(200))? {
-        if let Event::Key(key) = event::read()? {
-            match key.code {
-                KeyCode::Char('q') => app.quit(),
-                KeyCode::Up if app.screen == Screen::Devices => app.move_up(),
-                KeyCode::Down if app.screen == Screen::Devices => app.move_down(),
-                KeyCode::Char('m') => app.switch_screen(),
-                KeyCode::Char('c') => app.switch_screen(),
-                KeyCode::Char('s') => app.switch_screen(),
-                KeyCode::Enter => app.toggle_selected_sensor(),
-                _ => {}
-            }
-        }
+impl Tui {
+    pub fn new() -> anyhow::Result<Self> {
+        let stdout = io::stdout();
+        let backend = CrosstermBackend::new(stdout);
+        Ok(Self {
+            terminal: Terminal::new(backend)?,
+        })
     }
-    Ok(())
+
+    pub fn enter(&mut self) -> anyhow::Result<()> {
+        enable_raw_mode()?;
+        execute!(io::stdout(), EnterAlternateScreen)?;
+        Ok(())
+    }
+
+    pub fn exit(&mut self) -> anyhow::Result<()> {
+        disable_raw_mode()?;
+        execute!(io::stdout(), LeaveAlternateScreen)?;
+        Ok(())
+    }
+
+    pub fn draw(&mut self, devices: &[Device]) -> anyhow::Result<()> {
+        self.terminal.draw(|f| Self::ui(f, devices))?;
+        Ok(())
+    }
+
+    fn ui(f: &mut Frame, devices: &[Device]) {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(1)
+            .constraints([Constraint::Percentage(100)])
+            .split(f.size());
+
+        let items: Vec<ListItem> = devices
+            .iter()
+            .map(|d| {
+                let status = if d.active {
+                    Span::styled("ON", Style::default().fg(Color::Green))
+                } else {
+                    Span::styled("OFF", Style::default().fg(Color::Red))
+                };
+                ListItem::new(format!("{:<10} [{}]", d.name, status.content))
+            })
+            .collect();
+
+        let list = List::new(items)
+            .block(Block::default().title("Devices").borders(Borders::ALL))
+            .highlight_style(Style::default().add_modifier(Modifier::BOLD));
+
+        f.render_widget(list, chunks[0]);
+    }
 }

@@ -4,8 +4,8 @@ use crate::models::DeviceReading;
 use crate::serial;
 use log::{error, info};
 
-const PROBE_THRESHOLD: f32 = 15.0;
-const CPU_THRESHOLD: f32 = 75.0;
+const PROBE_THRESHOLD: f32 = 24.0;
+const CPU_THRESHOLD: f32 = 40.0;
 const MOISTURE_THRESHOLD: f32 = 25.0;
 
 pub struct SensorController<'a> {
