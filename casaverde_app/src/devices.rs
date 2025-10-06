@@ -6,10 +6,12 @@ use serde::Deserialize;
 use std::time::Duration;
 use tokio::time::sleep;
 use crate::client::AppClient;
+use crate::models::{ConfigEntry, ConfigData}; // Added ConfigData import
 use casaverde_utils::log::{error, info};
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Debug, Default)] // Removed Copy
 pub struct DeviceEntry {
+    pub id: String, // Added id field
     pub value: Option<f32>,
     pub active: bool,
 }
@@ -23,15 +25,9 @@ pub struct DeviceConfig {
     pub serial_port: String,
 }
 
-#[derive(Clone, Deserialize)]
-pub struct ConfigFile {
-    pub server: String,
-    pub configs: Vec<DeviceConfig>,
-}
-
 #[derive(Clone)]
 pub struct DeviceData {
-    pub config: ConfigFile,
+    pub config: Vec<ConfigEntry>, // Updated to Vec<ConfigEntry>
     pub devices: Vec<DeviceEntry>,
     pub active_count: usize,
     pub client: AppClient,
@@ -40,18 +36,25 @@ pub struct DeviceData {
 impl DeviceData {
     pub fn new(config_path: &str, server: &str) -> Self {
         let content = std::fs::read_to_string(config_path).unwrap_or_default();
-        let mut config: ConfigFile = toml::from_str(&content).unwrap_or(ConfigFile {
-            server: server.to_string(),
-            configs: Vec::new(),
-        });
+        let config: Vec<ConfigEntry> = toml::from_str(&content)
+            .unwrap_or_else(|_| vec![ConfigEntry {
+                current: ConfigData {
+                    server: server.to_string(),
+                    controller_id: "blackbeard-pi".to_string(),
+                    serial_port: None,
+                    light_relay_id: "relay-1".to_string(),
+                    light_on_hours: 16,
+                    light_off_hours: 8,
+                },
+                backup: None,
+            }]);
 
-        if config.server.is_empty() {
-            config.server = server.to_string();
-        }
-
-        let num_devices = config.configs.len();
-        let devices = vec![DeviceEntry::default(); num_devices];
-        let client = AppClient::new(&config.server, "casaverde_app".to_string());
+        let devices = config.iter().map(|c| DeviceEntry {
+            id: c.current.controller_id.clone(),
+            value: None,
+            active: false,
+        }).collect();
+        let client = AppClient::new(&config[0].current.server, "casaverde_app".to_string());
 
         Self {
             config,
@@ -62,23 +65,22 @@ impl DeviceData {
     }
 
     pub async fn update_devices(&mut self) -> std::io::Result<()> {
-        for (i, cfg) in self.config.configs.iter().enumerate() {
-            let endpoint = match cfg.r#type.as_str() {
-                "temperature" | "moisture" | "nutrients" | "humidity" | "solar" | "water" => "/sensor_data",
-                "relay" => "/commands",
-                _ => "/sensor_data",
+        for (i, cfg) in self.config.iter().enumerate() {
+            let endpoint = match cfg.current.serial_port {
+                Some(ref port) if port.contains("temperature") => "/sensor_data".to_string(),
+                Some(ref port) if port.contains("relay") => "/commands".to_string(),
+                _ => "/sensor_data".to_string(),
             };
             let payload = serde_json::json!({
                 "client_id": "casaverde_app",
                 "devices": [
-                    {"id": cfg.id, "action": "GET"}
+                    {"id": cfg.current.controller_id, "action": "GET"}
                 ]
             });
-            if self.client.send_sensor_data(payload, endpoint).await {
-                info!("Fetched data for device {}", cfg.id);
-                // Fetch data from server response (temporary placeholders)
-                let value = match cfg.id.as_str() {
-                    "blackbeard-cpu" => Some(35.0), // Replace with server response
+            if self.client.send_sensor_data(payload, &endpoint).await {
+                info!("Fetched data for device {}", cfg.current.controller_id);
+                let value = match cfg.current.controller_id.as_str() {
+                    "blackbeard-cpu" => Some(35.0),
                     "blackbeard-probe" => Some(20.0),
                     "moisture-1" => Some(50.0),
                     "nutrients-1" => Some(0.5),
@@ -91,12 +93,16 @@ impl DeviceData {
                     "relay-4" => Some(0.0),
                     _ => None,
                 };
-                self.devices[i].value = value;
-                self.devices[i].active = value.is_some();
+                if i < self.devices.len() {
+                    self.devices[i].value = value;
+                    self.devices[i].active = value.is_some();
+                }
             } else {
-                error!("Failed to fetch data for device {}", cfg.id);
-                self.devices[i].value = None;
-                self.devices[i].active = false;
+                error!("Failed to fetch data for device {}", cfg.current.controller_id);
+                if i < self.devices.len() {
+                    self.devices[i].value = None;
+                    self.devices[i].active = false;
+                }
             }
             sleep(Duration::from_millis(50)).await;
         }
@@ -108,6 +114,13 @@ impl DeviceData {
         if sensor < self.devices.len() {
             self.devices[sensor].active = !self.devices[sensor].active;
             self.active_count = self.devices.iter().filter(|d| d.active).count();
+            // Send toggle command to controller (placeholder)
+            let cmd = if self.devices[sensor].active {
+                format!("SET {} ON", self.devices[sensor].id)
+            } else {
+                format!("SET {} OFF", self.devices[sensor].id)
+            };
+            println!("Sending command to controller: {}", cmd); // Replace with client call
         }
     }
 }
