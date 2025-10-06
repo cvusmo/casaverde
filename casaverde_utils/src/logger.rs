@@ -1,18 +1,21 @@
+// Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
+// github.com/cvusmo/casaverde/casaverde_utils
+// logger.rs
+
 use crate::dirs::get_casaverde_log_dir;
+use crate::fs::create_file;
 use crate::io::{new_error, IoError, IoErrorKind};
 use chrono::Local;
 use env_logger::{Builder, Target};
 use log::LevelFilter;
-use std::{fs::File, io::Write};
+use std::io::Write;
 
-/// Initializes a simple log file per binary:
-///   ~/casaverde/target/build/log/<app_name>.log
 pub fn init_logger(app_name: &str, level: LevelFilter) -> Result<(), IoError> {
     let log_dir = get_casaverde_log_dir()
         .map_err(|e| new_error(IoErrorKind::NotFound, format!("Log directory error: {}", e)))?;
     let log_path = log_dir.join(format!("{}.log", app_name));
 
-    let file = File::create(&log_path).map_err(|e| {
+    let file = create_file(&log_path).map_err(|e| {
         new_error(
             IoErrorKind::Other,
             format!("Failed to create log file: {}", e),

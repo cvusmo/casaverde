@@ -3,8 +3,7 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_OUTPUT="${PROJECT_ROOT}/build_output"
-CONFIG_DIR="${HOME}/.config/casaverde_server"
-APP_CONFIG_DIR="${HOME}/.config/casaverde_app"
+CONFIG_DIR="${HOME}/.config/casaverde"
 LOG_DIR="${BUILD_OUTPUT}/linux/logs"
 BUILD_LOG="${LOG_DIR}/build.log"
 
@@ -22,18 +21,15 @@ CONTROLLER_IP="$DEFAULT_IP"
 SERVER_HOSTNAME="$DEFAULT_HOSTNAME"
 APP_HOSTNAME="$DEFAULT_HOSTNAME"
 CONTROLLER_HOSTNAME="$DEFAULT_HOSTNAME"
-
 SERVER_PORT="$DEFAULT_PORT"
 APP_PORT="$DEFAULT_PORT"
 CONTROLLER_PORT="$DEFAULT_PORT"
-
 SERIAL_PORT_REAL="$DEFAULT_SERIAL_PORT_REAL"
 SERIAL_PORT_SIM="$DEFAULT_SERIAL_PORT_SIM"
 
 # Target platforms
 declare -A TARGETS
 TARGETS["linux"]="x86_64-unknown-linux-gnu"
-# TODO: add windows, raspberry pi, etc.
 
 mkdir -p "${BUILD_OUTPUT}/linux"
 mkdir -p "$LOG_DIR"
@@ -43,9 +39,9 @@ log_with_timestamp() {
 }
 
 generate_certificates() {
-  local cert_path="$CONFIG_DIR/server.crt"
-  local key_path="$CONFIG_DIR/server.key"
-  local cn="$SERVER_HOSTNAME"  # Use hostname for CN
+  local cert_path="${CONFIG_DIR}/casaverde_server/server.crt"
+  local key_path="${CONFIG_DIR}/casaverde_server/server.key"
+  local cn="$SERVER_HOSTNAME"
 
   if [[ -f "$cert_path" && -f "$key_path" ]]; then
     local existing_cn
@@ -53,8 +49,8 @@ generate_certificates() {
     if [[ "$existing_cn" == "$cn" ]]; then
       log_with_timestamp "Existing certificate matches CN=$cn, reusing it."
       chmod +r "$cert_path" "$key_path" 2>/dev/null || true
-      mkdir -p "$APP_CONFIG_DIR" && chmod u+rwx "$APP_CONFIG_DIR" 2>/dev/null || true
-      cp "$cert_path" "$APP_CONFIG_DIR/server.crt" 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Failed copying cert"; exit 1; }
+      mkdir -p "${CONFIG_DIR}/casaverde_app" && chmod u+rwx "${CONFIG_DIR}/casaverde_app" 2>/dev/null || true
+      cp "$cert_path" "${CONFIG_DIR}/casaverde_app/server.crt" 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Failed copying cert"; exit 1; }
       return
     else
       log_with_timestamp "Existing certificate CN=$existing_cn, needs CN=$cn. Regenerating..."
@@ -62,13 +58,13 @@ generate_certificates() {
   fi
 
   log_with_timestamp "Generating self-signed TLS certificate for CN=$cn..."
-  mkdir -p "$CONFIG_DIR" || { log_with_timestamp "Error creating $CONFIG_DIR"; exit 1; }
-  chmod u+rwx "$CONFIG_DIR" 2>/dev/null || true
+  mkdir -p "${CONFIG_DIR}/casaverde_server" || { log_with_timestamp "Error creating ${CONFIG_DIR}/casaverde_server"; exit 1; }
+  chmod u+rwx "${CONFIG_DIR}/casaverde_server" 2>/dev/null || true
   openssl req -x509 -newkey rsa:4096 -keyout "$key_path" -out "$cert_path" \
     -sha256 -days 3650 -nodes -subj "/CN=$cn" 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Certificate generation failed"; exit 1; }
   chmod +r "$cert_path" "$key_path" 2>/dev/null || true
-  mkdir -p "$APP_CONFIG_DIR" && chmod u+rwx "$APP_CONFIG_DIR" 2>/dev/null || true
-  cp "$cert_path" "$APP_CONFIG_DIR/server.crt" 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Failed copying cert"; exit 1; }
+  mkdir -p "${CONFIG_DIR}/casaverde_app" && chmod u+rwx "${CONFIG_DIR}/casaverde_app" 2>/dev/null || true
+  cp "$cert_path" "${CONFIG_DIR}/casaverde_app/server.crt" 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Failed copying cert"; exit 1; }
 }
 
 prompt_config() {
@@ -87,17 +83,15 @@ prompt_config() {
     CONTROLLER_IP=${CONTROLLER_IP:-$DEFAULT_IP}
     read -rp "Enter Controller Hostname (default $DEFAULT_HOSTNAME): " CONTROLLER_HOSTNAME
     CONTROLLER_HOSTNAME=${CONTROLLER_HOSTNAME:-$DEFAULT_HOSTNAME}
-
     read -rp "Enter Server Port (default $DEFAULT_PORT): " SERVER_PORT
     SERVER_PORT=${SERVER_PORT:-$DEFAULT_PORT}
     read -rp "Enter App Port (default $DEFAULT_PORT): " APP_PORT
     APP_PORT=${APP_PORT:-$DEFAULT_PORT}
     read -rp "Enter Controller Port (default $DEFAULT_PORT): " CONTROLLER_PORT
     CONTROLLER_PORT=${CONTROLLER_PORT:-$DEFAULT_PORT}
-
-    read -rp "Real serial port (default $DEFAULT_SERIAL_PORT_REAL): " SERIAL_PORT_REAL
+    read -rp "Enter Real serial port (default $DEFAULT_SERIAL_PORT_REAL): " SERIAL_PORT_REAL
     SERIAL_PORT_REAL=${SERIAL_PORT_REAL:-$DEFAULT_SERIAL_PORT_REAL}
-    read -rp "Sim serial port (default $DEFAULT_SERIAL_PORT_SIM): " SERIAL_PORT_SIM
+    read -rp "Enter Sim serial port (default $DEFAULT_SERIAL_PORT_SIM): " SERIAL_PORT_SIM
     SERIAL_PORT_SIM=${SERIAL_PORT_SIM:-$DEFAULT_SERIAL_PORT_SIM}
   fi
 
@@ -119,7 +113,8 @@ generate_config() {
 server = "${SERVER_IP}:${SERVER_PORT}"
 hostname = "${SERVER_HOSTNAME}"
 EOF
-      cp "$config_path" "$CONFIG_DIR/config.toml" || true
+      mkdir -p "${CONFIG_DIR}/casaverde_server"
+      cp "$config_path" "${CONFIG_DIR}/casaverde_server/config.toml" || { log_with_timestamp "Failed to copy config.toml for $project"; exit 1; }
       ;;
     "casaverde_app")
       cat >"$config_path" <<EOF
@@ -142,6 +137,13 @@ interval = 15
 [[configs]]
 id = "moisture-1"
 type = "moisture"
+endpoint = "/sensor_data"
+serial_port = "$SERIAL_PORT_SIM"
+interval = 15
+
+[[configs]]
+id = "nutrients-1"
+type = "nutrients"
 endpoint = "/sensor_data"
 serial_port = "$SERIAL_PORT_SIM"
 interval = 15
@@ -174,8 +176,8 @@ endpoint = "/sensor_data"
 serial_port = "$SERIAL_PORT_REAL"
 interval = 15
 EOF
-      mkdir -p "$APP_CONFIG_DIR"
-      cp "$config_path" "$APP_CONFIG_DIR/config.toml" || true
+      mkdir -p "${CONFIG_DIR}/casaverde_app"
+      cp "$config_path" "${CONFIG_DIR}/casaverde_app/config.toml" || { log_with_timestamp "Failed to copy config.toml for $project"; exit 1; }
       ;;
     "casaverde_controller")
       cat >"$config_path" <<EOF
@@ -187,6 +189,18 @@ light_relay_id = "relay-1"
 light_on_hours = 16
 light_off_hours = 8
 EOF
+      # Controller expects config.toml in the working directory, not ~/.config
+      ;;
+    "casaverde_sim")
+      cat >"$config_path" <<EOF
+[simulation]
+width = 10
+height = 10
+moisture_decay = 0.01
+nutrient_decay = 0.005
+growth_rate = 0.002
+EOF
+      log_with_timestamp "Generated casaverde_sim config: $config_path"
       ;;
   esac
 }
@@ -203,6 +217,7 @@ build_project() {
     "casaverde_server") project_hostname="$SERVER_HOSTNAME" ;;
     "casaverde_app") project_hostname="$APP_HOSTNAME" ;;
     "casaverde_controller") project_hostname="$CONTROLLER_HOSTNAME" ;;
+    "casaverde_sim") project_hostname="$DEFAULT_HOSTNAME" ;;
   esac
 
   export HOSTNAME="$project_hostname"
@@ -238,9 +253,9 @@ build_project() {
   local cargo_args="--target $target"
   [[ "$mode" == "release" ]] && cargo_args="$cargo_args --release"
   if [[ "$use_cross" == "true" ]]; then
-    cross build $cargo_args 2>&1 | tee -a "$BUILD_LOG" || exit 1
+    cross build $cargo_args 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Build failed for $project"; exit 1; }
   else
-    cargo build $cargo_args 2>&1 | tee -a "$BUILD_LOG" || exit 1
+    cargo build $cargo_args 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Build failed for $project"; exit 1; }
   fi
 
   popd >/dev/null
@@ -249,34 +264,30 @@ build_project() {
   local bin_path="$PROJECT_ROOT/target/$target/$mode/$bin_name"
   [[ ! -f "$bin_path" ]] && { log_with_timestamp "Binary not found: $bin_path"; exit 1; }
   mkdir -p "$output_dir/$project"
-  cp "$bin_path" "$output_dir/$project/$bin_name"
+  cp "$bin_path" "$output_dir/$project/$bin_name" || { log_with_timestamp "Failed to copy binary for $project"; exit 1; }
   chmod +x "$output_dir/$project/$bin_name"
   generate_config "$project" "$output_dir/$project/config.toml"
-  cp "$CONFIG_DIR/server.crt" "$output_dir/$project/" || true
-  [[ "$project" == "casaverde_server" ]] && cp "$CONFIG_DIR/server.key" "$output_dir/$project/" || true
+  cp "${CONFIG_DIR}/casaverde_server/server.crt" "$output_dir/$project/" || true
+  [[ "$project" == "casaverde_server" ]] && cp "${CONFIG_DIR}/casaverde_server/server.key" "$output_dir/$project/" || true
   log_with_timestamp "Built $project successfully"
 }
 
 deploy_project() {
   local project="$1"
   local output_dir="$2"
+  local mode="${3:-debug}"  # Default to debug for testing
 
   local bin_name="casaverde_${project##casaverde_}"
-  local bin_path="$PROJECT_ROOT/target/$TARGET/$MODE/$bin_name"
+  local bin_path="$PROJECT_ROOT/target/${TARGETS[linux]}/$mode/$bin_name"
   [[ ! -f "$bin_path" ]] && { log_with_timestamp "Binary not found for deploy: $bin_path"; exit 1; }
 
   mkdir -p "$output_dir/$project"
-  cp "$bin_path" "$output_dir/$project/$bin_name"
+  cp "$bin_path" "$output_dir/$project/$bin_name" || { log_with_timestamp "Failed to copy binary for $project"; exit 1; }
   chmod +x "$output_dir/$project/$bin_name"
 
-  local config_src="$CONFIG_DIR/config.toml"
-  if [[ -f "$config_src" ]] && grep -q "https://" "$config_src"; then
-    generate_config "$project" "$output_dir/$project/config.toml"
-    cp "$CONFIG_DIR/server.crt" "$output_dir/$project/" || true
-    [[ "$project" == "casaverde_server" ]] && cp "$CONFIG_DIR/server.key" "$output_dir/$project/" || true
-  else
-    log_with_timestamp "Skipping config copy for $project (no https:// found)"
-  fi
+  generate_config "$project" "$output_dir/$project/config.toml"
+  cp "${CONFIG_DIR}/casaverde_server/server.crt" "$output_dir/$project/" || true
+  [[ "$project" == "casaverde_server" ]] && cp "${CONFIG_DIR}/casaverde_server/server.key" "$output_dir/$project/" || true
 
   log_with_timestamp "Deployed $project successfully"
 }
@@ -288,19 +299,29 @@ main() {
   [[ "$action" =~ ^(debug|release|deploy)$ ]] && prompt_config
 
   case "$action" in
-    "debug"|"release")
-      for project in "casaverde_server" "casaverde_app" "casaverde_controller"; do
-        build_project "$project" "$action" "${TARGETS[linux]}" "${BUILD_OUTPUT}/linux" "false"
+    "debug")
+      cargo build --manifest-path "$PROJECT_ROOT/Cargo.toml" --target "${TARGETS[linux]}" --all 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Workspace build failed"; exit 1; }
+      for project in "casaverde_server" "casaverde_app" "casaverde_controller" "casaverde_sim"; do
+        build_project "$project" "debug" "${TARGETS[linux]}" "${BUILD_OUTPUT}/linux" "false"
       done
-      log_with_timestamp "$action build complete"
+      log_with_timestamp "Debug build complete"
+      ;;
+    "release")
+      cargo build --manifest-path "$PROJECT_ROOT/Cargo.toml" --target "${TARGETS[linux]}" --release --all 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Workspace build failed"; exit 1; }
+      for project in "casaverde_server" "casaverde_app" "casaverde_controller" "casaverde_sim"; do
+        build_project "$project" "release" "${TARGETS[linux]}" "${BUILD_OUTPUT}/linux" "false"
+      done
+      log_with_timestamp "Release build complete"
       ;;
     "deploy")
-      MODE="release"
+      MODE="debug"  # Use debug for testing
       TARGET="${TARGETS[linux]}"
-      for project in "casaverde_server" "casaverde_controller"; do
+      cargo build --manifest-path "$PROJECT_ROOT/Cargo.toml" --target "$TARGET" --all 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Workspace build failed"; exit 1; }
+      for project in "casaverde_server" "casaverde_controller" "casaverde_sim"; do
         build_project "$project" "$MODE" "$TARGET" "${BUILD_OUTPUT}/linux" "false"
-        deploy_project "$project" "${BUILD_OUTPUT}/linux"
+        deploy_project "$project" "${BUILD_OUTPUT}/linux" "$MODE"
       done
+      log_with_timestamp "Deploy complete"
       ;;
     "clean")
       cargo clean --manifest-path "$PROJECT_ROOT/Cargo.toml" 2>&1 | tee -a "$BUILD_LOG" || true
@@ -313,4 +334,3 @@ main() {
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   main "$@"
 fi
-

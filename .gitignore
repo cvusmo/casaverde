@@ -13,6 +13,7 @@
 **/*.rmeta
 Cargo.lock
 Cargo.toml.orig
+/build_output/
 
 # --- Runtime logs and telemetry ---
 /logs/

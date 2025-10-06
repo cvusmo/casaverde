@@ -14,10 +14,19 @@ cleanup() {
 }
 trap cleanup SIGINT SIGTERM
 
+check_python_deps() {
+    for dep in serial; do
+        python3 -c "import $dep" 2>/dev/null || {
+            echo "Python module '$dep' not found in venv. Install with: pip install $dep"
+            exit 1
+        }
+    done
+}
+
 select_simulation() {
-    sim_files=("$PROJECT_ROOT/casaverde_sim"/simulation_*.py)
+    sim_files=("$PROJECT_ROOT/casaverde_sim/py"/simulation_*.py)
     if [[ ${#sim_files[@]} -eq 0 ]]; then
-        echo "No simulation Python files found in $PROJECT_ROOT/casaverde_sim"
+        echo "No simulation Python files found in $PROJECT_ROOT/casaverde_sim/py"
         exit 1
     fi
 
@@ -106,9 +115,13 @@ else
         log_with_timestamp "Activating Python virtual environment..."
         # shellcheck source=/dev/null
         source "$PROJECT_ROOT/casaverde_sim/venv/bin/activate"
+        check_python_deps
+    else
+        log_with_timestamp "Error: Python virtual environment not found at $PROJECT_ROOT/casaverde_sim/venv"
+        exit 1
     fi
     SIM_LOG="$SIM_LOG_DIR/python_sim.log"
-    python "$SIM_PY" &> "$SIM_LOG" &
+    python3 "$SIM_PY" &> "$SIM_LOG" &
     SIM_PID=$!
     log_with_timestamp "Python simulation running (PID $SIM_PID)"
 fi
