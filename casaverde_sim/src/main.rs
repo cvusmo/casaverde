@@ -2,14 +2,14 @@
 // github.com/cvusmo/casaverde/casaverde_sim
 
 use casaverde_sim::sim::{run_simulation, Cell};
-use casaverde_utils::dirs::get_home_dir;
 use casaverde_utils::fs::{create_file, read_to_string, write_all};
 use casaverde_utils::io::{new_error, IoError, IoErrorKind};
+use casaverde_utils::log::{info, LevelFilter};
 use casaverde_utils::init_logger;
-use log::LevelFilter;
 use serde::Serialize;
 use tokio::sync::mpsc;
 use toml::Value;
+use std::path::PathBuf;
 
 #[derive(Serialize)]
 struct CellOutput {
@@ -20,9 +20,11 @@ struct CellOutput {
 
 #[tokio::main]
 async fn main() -> Result<(), IoError> {
-    let config_path = "config.toml";
-    let config: Value = toml::from_str(&read_to_string(config_path)?)
+    let config_path = PathBuf::from("config.toml");
+    info!("Starting casaverde_sim with config: {:?}", config_path);
+    let config: Value = toml::from_str(&read_to_string(&config_path)?)
         .map_err(|e| new_error(IoErrorKind::Other, format!("TOML parsing error: {}", e)))?;
+    info!("Config loaded: {:?}", config);
     let log_level = config.get("logging").and_then(|l| l.get("level")).and_then(|l| l.as_str())
         .map(|s| match s.to_lowercase().as_str() {
             "error" => LevelFilter::Error,
@@ -34,6 +36,7 @@ async fn main() -> Result<(), IoError> {
         })
         .unwrap_or(LevelFilter::Info);
     init_logger("casaverde_sim", log_level)?;
+    info!("Logger initialized for casaverde_sim");
 
     let width = config.get("simulation").and_then(|s| s.get("width")).and_then(|w| w.as_integer()).unwrap_or(10) as usize;
     let height = config.get("simulation").and_then(|s| s.get("height")).and_then(|h| h.as_integer()).unwrap_or(10) as usize;
@@ -41,9 +44,8 @@ async fn main() -> Result<(), IoError> {
     let (tx, mut rx) = mpsc::channel::<Vec<Cell>>(100);
     tokio::spawn(run_simulation(tx, width, height));
 
-    let mut output_file = get_home_dir()
-        .map_err(|e| new_error(IoErrorKind::NotFound, format!("Home directory error: {}", e)))?;
-    output_file.push("casaverde/target/build/sim_data.json");
+    let output_file = PathBuf::from("/tmp/casaverde_sim_data.json");
+    info!("Writing simulation data to: {:?}", output_file);
     loop {
         if let Some(cells) = rx.recv().await {
             let output: Vec<CellOutput> = cells.iter().map(|c| CellOutput {
@@ -57,6 +59,7 @@ async fn main() -> Result<(), IoError> {
                 .map_err(|e| new_error(IoErrorKind::Other, format!("File creation error: {}", e)))?;
             write_all(&mut file, json.as_bytes())
                 .map_err(|e| new_error(IoErrorKind::Other, format!("File write error: {}", e)))?;
+            info!("Wrote simulation data: {} cells", output.len());
         }
     }
 }

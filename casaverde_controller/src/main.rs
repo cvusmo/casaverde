@@ -1,8 +1,8 @@
 // Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 // github.com/cvusmo/casaverde/casaverde_controller
+
 use casaverde_controller::timer::run_light_timer;
 use casaverde_controller::{client, models};
-use casaverde_utils::dirs::get_home_dir;
 use casaverde_utils::fs::{read_to_string, write_all};
 use casaverde_utils::io::{new_error, IoError, IoErrorKind};
 use casaverde_utils::log::{error, info, LevelFilter};
@@ -16,16 +16,17 @@ use casaverde_controller::serial::{init_serial, send_serial_command};
 use casaverde_controller::sensors::SensorController;
 use toml::Value;
 use std::fs::File;
+use std::path::PathBuf;
 
 #[tokio::main]
 async fn main() -> Result<(), IoError> {
-    let mut config_path = get_home_dir()
-        .map_err(|e| new_error(IoErrorKind::NotFound, format!("Home directory error: {}", e)))?;
-    config_path.push("casaverde/casaverde_controller/config.toml");
+    let config_path = PathBuf::from("config.toml");
+    info!("Loading config from: {:?}", config_path);
     let config_str = read_to_string(&config_path)
         .map_err(|e| new_error(IoErrorKind::Other, format!("Failed to read config.toml: {}", e)))?;
     let config_toml: Value = toml::from_str(&config_str)
         .map_err(|e| new_error(IoErrorKind::Other, format!("Failed to parse config.toml: {}", e)))?;
+    info!("Config loaded: {:?}", config_toml);
     let log_level = config_toml.get("logging").and_then(|l| l.get("level")).and_then(|l| l.as_str())
         .map(|s| match s.to_lowercase().as_str() {
             "error" => LevelFilter::Error,

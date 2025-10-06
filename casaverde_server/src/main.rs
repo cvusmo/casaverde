@@ -4,21 +4,21 @@
 use axum::{Router, routing::{get, post}};
 use axum_server::tls_rustls::RustlsConfig;
 use casaverde_server::handlers;
-use casaverde_utils::dirs::get_home_dir;
 use casaverde_utils::fs::read_to_string;
 use casaverde_utils::io::{new_error, IoError, IoErrorKind};
+use casaverde_utils::log::{info, LevelFilter};
 use casaverde_utils::init_logger;
-use log::LevelFilter;
+use std::path::PathBuf;
 use toml::Value;
 use tokio::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), IoError> {
-    let mut config_path = get_home_dir()
-        .map_err(|e| new_error(IoErrorKind::NotFound, format!("Home directory error: {}", e)))?;
-    config_path.push("casaverde/casaverde_server/config.toml");
+    let config_path = PathBuf::from("config.toml");
+    info!("Loading config from: {:?}", config_path);
     let config: Value = toml::from_str(&read_to_string(&config_path)?)
         .map_err(|e| new_error(IoErrorKind::Other, format!("TOML parsing error: {}", e)))?;
+    info!("Config loaded: {:?}", config);
     let log_level = config.get("logging").and_then(|l| l.get("level")).and_then(|l| l.as_str())
         .map(|s| match s.to_lowercase().as_str() {
             "error" => LevelFilter::Error,
@@ -30,15 +30,16 @@ async fn main() -> Result<(), IoError> {
         })
         .unwrap_or(LevelFilter::Info);
     init_logger("casaverde_server", log_level)?;
+    info!("Server started");
 
-    let addr = server_addr(&config_path)?;
-    let cfg_dir = config_path.parent()
-        .ok_or_else(|| new_error(IoErrorKind::Other, "Invalid config directory"))?;
+    let addr = server_addr(&config)?;
+    let cfg_dir = PathBuf::from(".");
     std::fs::create_dir_all(&cfg_dir)
         .map_err(|e| new_error(IoErrorKind::Other, format!("Failed to create config directory: {}", e)))?;
 
     let crt = cfg_dir.join("server.crt");
     let key = cfg_dir.join("server.key");
+    info!("Loading certificates: crt={:?}, key={:?}", crt, key);
     if !crt.exists() || !key.exists() {
         return Err(new_error(IoErrorKind::NotFound, "Certificates missing"));
     }
@@ -60,6 +61,7 @@ async fn main() -> Result<(), IoError> {
         .route("/configs/{controller_id}", get(handlers::get_configs))
         .route("/configs", post(handlers::post_configs));
 
+    info!("Starting server on: {}", addr);
     axum_server::bind_rustls(addr, tls)
         .serve(app.into_make_service())
         .await
@@ -67,14 +69,10 @@ async fn main() -> Result<(), IoError> {
     Ok(())
 }
 
-fn server_addr(config_path: &std::path::PathBuf) -> Result<std::net::SocketAddr, IoError> {
-    let content = read_to_string(config_path)
-        .map_err(|e| new_error(IoErrorKind::Other, format!("Failed to read config: {}", e)))?;
-    let val: toml::Value = toml::from_str(&content)
-        .map_err(|e| new_error(IoErrorKind::Other, format!("Failed to parse TOML: {}", e)))?;
-    let ip = val.get("server")
+fn server_addr(config: &Value) -> Result<std::net::SocketAddr, IoError> {
+    let content = config.get("server")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| new_error(IoErrorKind::Other, "Server IP missing"))?;
-    ip.parse()
-        .map_err(|e| new_error(IoErrorKind::Other, format!("Invalid IP: {}", e)))
+        .ok_or_else(|| new_error(IoErrorKind::Other, "Server address missing"))?;
+    content.parse()
+        .map_err(|e| new_error(IoErrorKind::Other, format!("Invalid server address: {}", e)))
 }

@@ -3,10 +3,9 @@
 
 use casaverde_app::app::{run_app, App};
 use casaverde_app::tui::Tui;
-use casaverde_utils::dirs::get_home_dir;
 use casaverde_utils::fs::read_to_string;
 use casaverde_utils::io::{new_error, IoError, IoErrorKind};
-use casaverde_utils::log::{error, LevelFilter};
+use casaverde_utils::log::{error, info, LevelFilter};
 use clap::Parser;
 use std::path::PathBuf;
 use toml::Value;
@@ -19,11 +18,11 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<(), IoError> {
-    let mut config_path = get_home_dir()
-        .map_err(|e| new_error(IoErrorKind::NotFound, format!("Home directory error: {}", e)))?;
-    config_path.push("casaverde/casaverde_app/config.toml");
+    let config_path = PathBuf::from("config.toml");
+    info!("Loading config from: {:?}", config_path);
     let config: Value = toml::from_str(&read_to_string(&config_path)?)
         .map_err(|e| new_error(IoErrorKind::Other, format!("TOML parsing error: {}", e)))?;
+    info!("Config loaded: {:?}", config);
     let log_level = config.get("logging").and_then(|l| l.get("level")).and_then(|l| l.as_str())
         .map(|s| match s.to_lowercase().as_str() {
             "error" => LevelFilter::Error,
@@ -35,11 +34,13 @@ async fn main() -> Result<(), IoError> {
         })
         .unwrap_or(LevelFilter::Info);
     casaverde_utils::init_logger("casaverde_app", log_level)?;
+    info!("Logger initialized for casaverde_app");
 
     let args = Args::parse();
     let server = std::env::var("SERVER_IP")
         .map(|ip| format!("https://{ip}"))
         .unwrap_or(args.server);
+    info!("Using server: {}", server);
 
     run_tui_mode(&server, &config_path).await
 }
