@@ -3,8 +3,6 @@
 // src/tui.rs
 
 use crate::app::{App, Screen};
-use crate::devices::DeviceData;
-use crate::models::ConfigEntry;
 use crossterm::event::{self, Event, KeyCode};
 use crossterm::execute;
 use crossterm::terminal::{

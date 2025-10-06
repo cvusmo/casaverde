@@ -4,7 +4,6 @@
 
 use ratatui::widgets::ListState;
 use crate::devices::DeviceData;
-use crate::models::ConfigEntry;
 use casaverde_sim::sim::{run_simulation, Cell};
 use casaverde_utils::log::error;
 use crossterm::event::{self, Event, KeyCode};
