@@ -1,6 +1,6 @@
-// Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
-// github.com/cvusmo/casaverde/casaverde_utils
-// Config.toml -
+# Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
+# github.com/cvusmo/casaverde/casaverde_utils
+# Config.toml -
 
 [package]
 name = "casaverde_utils"

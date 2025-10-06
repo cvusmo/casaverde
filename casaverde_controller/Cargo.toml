@@ -1,6 +1,6 @@
-// Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
-// github.com/cvusmo/casaverde/casaverde_controller
-// Config.toml - HTTP client setup and data fetching
+# Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
+# github.com/cvusmo/casaverde/casaverde_controller
+# Config.toml - HTTP client setup and data fetching
 
 [package]
 name = "casaverde_controller"
