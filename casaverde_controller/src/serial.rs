@@ -16,7 +16,7 @@ pub fn init_serial(port_name: &str) -> Result<Box<dyn serialport::SerialPort>, s
         .open();
 
     match port {
-        Ok(mut p) => {
+        Ok(p) => {
             p.clear(ClearBuffer::Input)?;
             p.clear(ClearBuffer::Output)?;
             info!("Serial port {} initialized at 9600 baud", port_name);
