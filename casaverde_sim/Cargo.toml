@@ -1,0 +1,17 @@
+# Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
+# github.com/cvusmo/casaverde/casaverde_sim
+# Config.toml -
+
+[package]
+name = "casaverde_sim"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[dependencies]
+tokio.workspace = true
+chrono.workspace = true
+
+[lib]
+name = "casaverde_sim"
+path = "src/lib.rs"

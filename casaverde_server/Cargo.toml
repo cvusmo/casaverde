@@ -11,8 +11,8 @@ edition.workspace = true
 [dependencies]
 axum.workspace = true
 axum-server.workspace = true
-dirs.workspace = true
-env_logger.workspace = true
+#dirs.workspace = true
+#env_logger.workspace = true
 lazy_static.workspace = true
 log.workspace = true
 reqwest.workspace = true

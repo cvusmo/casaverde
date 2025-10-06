@@ -4,7 +4,7 @@
 
 use std::error::Error;
 use crate::models::{ConfigEntry};
-use log::{error, info, warn};
+use casaverde_utils::log::{error, info, warn};
 use reqwest::Client;
 use serde::Serialize;
 use std::time::Instant;

@@ -1,2 +1,0 @@
-#!/bin/bash
-startx -- :1 vt37

@@ -2,7 +2,7 @@
 use crate::controller::Command;
 use crate::models::DeviceReading;
 use crate::serial;
-use log::{error, info};
+use casaverde_utils::log::{error, info};
 
 const PROBE_THRESHOLD: f32 = 24.0;
 const CPU_THRESHOLD: f32 = 40.0;

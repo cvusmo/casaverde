@@ -3,7 +3,7 @@
 // src/timer.rs
 
 use crate::controller::Command;
-use log::info;
+use casaverde_utils::log::info;
 use tokio::sync::mpsc;
 use tokio::time::interval;
 

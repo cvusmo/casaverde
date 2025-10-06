@@ -2,7 +2,7 @@
 // github.com/cvusmo/casaverde/casaverde_controller
 // src/config.rs - Configuration loading and hostname utilities
 
-use log::{error, info};
+use casaverde_utils::log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::fs;
 

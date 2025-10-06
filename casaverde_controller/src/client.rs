@@ -6,7 +6,7 @@ use crate::config;
 use crate::config::Config;
 use crate::controller::Command;
 use crate::models::ConfigEntry;
-use log::{error, info};
+use casaverde_utils::log::{error, info};
 use reqwest::{Client, Certificate};
 use serde::Serialize;
 use serde_json::Value;

@@ -4,7 +4,9 @@
 
 use casaverde_controller::timer::run_light_timer;
 use casaverde_controller::{client, models};
-use log::{error, info};
+use casaverde_utils::log::{error, info};
+use casaverde_utils::init_logger;
+use casaverde_utils::log::LevelFilter;
 use std::sync::Arc;
 use tokio::{spawn, sync::mpsc, time::interval};
 use casaverde_controller::config;
@@ -12,12 +14,11 @@ use casaverde_controller::controller::{process_local_rules, process_remote_readi
 use casaverde_controller::gpio;
 use casaverde_controller::serial::{init_serial, send_serial_command};
 use casaverde_controller::sensors::SensorController;
-use casaverde_utils;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize logger
-    casaverde_utils::init_logger("casaverde_controller", log::LevelFilter::Info)?;
+    init_logger("casaverde_controller", LevelFilter::Info)?;
     info!("Starting casaverde_controller on {}", config::get_hostname());
 
     // Load local config

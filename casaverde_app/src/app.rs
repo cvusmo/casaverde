@@ -1,37 +1,152 @@
-use crate::devices::{self, Device};
-use crate::tui::Tui;
+// Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
+// github.com/cvusmo/casaverde/casaverde_app
+// app.rs -
+
+use crate::devices::DeviceData;
+use casaverde_sim::sim::{run_simulation, Cell};
+use casaverde_utils::log::{info, warn, error};
 use crossterm::event::{self, Event, KeyCode};
+use std::io;
 use std::time::{Duration, Instant};
+use tokio::sync::mpsc;
+use tokio::task;
 
 const POLL_INTERVAL: Duration = Duration::from_millis(100);
 const DEVICE_REFRESH_INTERVAL: Duration = Duration::from_secs(2);
 
-pub async fn run_app(tui: &mut Tui) -> anyhow::Result<()> {
-    let mut devices = devices::fetch_devices().await.unwrap_or_default();
+// Define Screen enum for UI modes
+#[derive(Clone, Copy, PartialEq)]
+pub enum Screen {
+    Devices,
+    Monitoring,
+    Config,
+}
+
+// Centralized App struct for state
+pub struct App {
+    pub sensor_data: DeviceData,
+    pub selected: usize,
+    pub simulation_rx: mpsc::Receiver<Vec<Cell>>,
+    pub running: bool,
+    pub screen: Screen,
+    pub quit: bool,
+}
+
+impl App {
+    /// Create new App instance with simulation channel and loaded config.
+    pub fn new(config_path: &str, server: &str) -> Self {
+        let sensor_data = DeviceData::new(config_path, server);
+        let (tx, rx) = mpsc::channel::<Vec<Cell>>(8);
+
+        // Start background deterministic simulation task
+        task::spawn(run_simulation(tx, 8, 8));
+
+        Self {
+            sensor_data,
+            selected: 0,
+            simulation_rx: rx,
+            running: true,
+            screen: Screen::Devices,
+            quit: false,
+        }
+    }
+
+    /// Update all sensors and simulation concurrently.
+    pub async fn update(&mut self) {
+        if let Err(e) = self.sensor_data.update_devices().await {
+            error!("Device update failed: {:?}", e);
+        }
+
+        if let Ok(Some(sim_data)) =
+            tokio::time::timeout(Duration::from_millis(10), self.simulation_rx.recv()).await
+        {
+            let avg_height: f32 =
+                sim_data.iter().map(|c| c.plant_height).sum::<f32>() / sim_data.len() as f32;
+
+            // Map simulation data to first sensor (example mapping)
+            if !self.sensor_data.devices.is_empty() {
+                self.sensor_data.devices[0].value = Some(avg_height * 100.0);
+            }
+        }
+    }
+
+    /// Toggle currently selected sensor’s state.
+    pub fn toggle_selected(&mut self) {
+        if let Some(device) = self.sensor_data.devices.get_mut(self.selected) {
+            device.active = !device.active;
+        }
+    }
+
+    /// Cycle selection index.
+    pub fn next_sensor(&mut self) {
+        self.selected = (self.selected + 1) % self.sensor_data.devices.len();
+    }
+
+    /// Graceful shutdown flag.
+    pub fn stop(&mut self) {
+        self.running = false;
+    }
+
+    /// Move selection up.
+    pub fn move_up(&mut self) {
+        if self.selected > 0 {
+            self.selected -= 1;
+        }
+    }
+
+    /// Move selection down.
+    pub fn move_down(&mut self) {
+        if self.selected < self.sensor_data.devices.len().saturating_sub(1) {
+            self.selected += 1;
+        }
+    }
+
+    /// Switch between screens.
+    pub fn switch_screen(&mut self) {
+        self.screen = match self.screen {
+            Screen::Devices => Screen::Monitoring,
+            Screen::Monitoring => Screen::Config,
+            Screen::Config => Screen::Devices,
+        };
+    }
+}
+
+/// Run the TUI application loop.
+pub async fn run_app(tui: &mut crate::tui::Tui, app: &mut App) -> io::Result<()> {
     let mut last_refresh = Instant::now();
 
     loop {
-        tui.draw(&devices)?;
+        tui.draw(app)?;
 
         if event::poll(POLL_INTERVAL)? {
             match event::read()? {
                 Event::Key(key) => match key.code {
                     KeyCode::Char('q') => break,
+                    KeyCode::Up => app.move_up(),
+                    KeyCode::Down => app.move_down(),
+                    KeyCode::Enter => app.toggle_selected(),
                     KeyCode::Char('r') => {
-                        devices = devices::fetch_devices().await?;
+                        app.sensor_data.update_devices().await?;
                     }
                     KeyCode::Char('t') => {
-                        devices::toggle_random_device(&mut devices).await?;
+                        app.toggle_selected();
+                    }
+                    KeyCode::Char('m') | KeyCode::Char('c') | KeyCode::Char('s') => {
+                        app.switch_screen();
                     }
                     _ => {}
                 },
-                _ => {}
+                _ => {},
             }
         }
 
         if last_refresh.elapsed() >= DEVICE_REFRESH_INTERVAL {
-            devices = devices::update_devices(devices).await?;
+            app.update().await;
             last_refresh = Instant::now();
+        }
+
+        if app.quit {
+            break;
         }
     }
 

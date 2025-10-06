@@ -1,6 +1,6 @@
 // src/serial.rs
 use crate::controller::Command;
-use log::{error, info};
+use casaverde_utils::log::{error, info};
 use serialport::{ClearBuffer, DataBits, Parity, StopBits};
 use std::time::Duration;
 

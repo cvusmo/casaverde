@@ -9,8 +9,8 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
-env_logger.workspace = true
-log.workspace = true
+#env_logger.workspace = true
+#log.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
