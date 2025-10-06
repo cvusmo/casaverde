@@ -1,24 +1,39 @@
 // Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 // github.com/cvusmo/casaverde/casaverde_server
-// src/main.rs
 
 use axum::{Router, routing::{get, post}};
 use axum_server::tls_rustls::RustlsConfig;
 use casaverde_server::handlers;
 use casaverde_utils::dirs::get_home_dir;
+use casaverde_utils::fs::read_to_string;
 use casaverde_utils::io::{new_error, IoError, IoErrorKind};
 use casaverde_utils::init_logger;
 use log::LevelFilter;
+use toml::Value;
 use tokio::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), IoError> {
-    init_logger("casaverde_server", LevelFilter::Info)?;
-    let addr = server_addr()?;
+    let mut config_path = get_home_dir()
+        .map_err(|e| new_error(IoErrorKind::NotFound, format!("Home directory error: {}", e)))?;
+    config_path.push("casaverde/casaverde_server/config.toml");
+    let config: Value = toml::from_str(&read_to_string(&config_path)?)
+        .map_err(|e| new_error(IoErrorKind::Other, format!("TOML parsing error: {}", e)))?;
+    let log_level = config.get("logging").and_then(|l| l.get("level")).and_then(|l| l.as_str())
+        .map(|s| match s.to_lowercase().as_str() {
+            "error" => LevelFilter::Error,
+            "warn" => LevelFilter::Warn,
+            "info" => LevelFilter::Info,
+            "debug" => LevelFilter::Debug,
+            "trace" => LevelFilter::Trace,
+            _ => LevelFilter::Info,
+        })
+        .unwrap_or(LevelFilter::Info);
+    init_logger("casaverde_server", log_level)?;
 
-    let mut cfg_dir = get_home_dir()
-        .map_err(|e| new_error(IoErrorKind::NotFound, format!("Config directory error: {}", e)))?;
-    cfg_dir.push("casaverde/casaverde_server");
+    let addr = server_addr(&config_path)?;
+    let cfg_dir = config_path.parent()
+        .ok_or_else(|| new_error(IoErrorKind::Other, "Invalid config directory"))?;
     std::fs::create_dir_all(&cfg_dir)
         .map_err(|e| new_error(IoErrorKind::Other, format!("Failed to create config directory: {}", e)))?;
 
@@ -52,21 +67,14 @@ async fn main() -> Result<(), IoError> {
     Ok(())
 }
 
-fn server_addr() -> Result<std::net::SocketAddr, IoError> {
-    let mut cfg = get_home_dir()
-        .map_err(|e| new_error(IoErrorKind::NotFound, format!("Config directory error: {}", e)))?;
-    cfg.push("casaverde/casaverde_server/config.toml");
-
-    let content = std::fs::read_to_string(&cfg)
+fn server_addr(config_path: &std::path::PathBuf) -> Result<std::net::SocketAddr, IoError> {
+    let content = read_to_string(config_path)
         .map_err(|e| new_error(IoErrorKind::Other, format!("Failed to read config: {}", e)))?;
-
     let val: toml::Value = toml::from_str(&content)
         .map_err(|e| new_error(IoErrorKind::Other, format!("Failed to parse TOML: {}", e)))?;
-
     let ip = val.get("server")
         .and_then(|v| v.as_str())
         .ok_or_else(|| new_error(IoErrorKind::Other, "Server IP missing"))?;
-
     ip.parse()
         .map_err(|e| new_error(IoErrorKind::Other, format!("Invalid IP: {}", e)))
 }

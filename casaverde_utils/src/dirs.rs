@@ -22,10 +22,10 @@ pub fn get_home_dir() -> Result<PathBuf, io::Error> {
     ))
 }
 
-/// Returns ~/casaverde/target/build/log and ensures it exists.
+/// Returns ~/casaverde/build_output/linux/logs and ensures it exists.
 pub fn get_casaverde_log_dir() -> Result<PathBuf, io::Error> {
     let mut log_dir = get_home_dir()?;
-    log_dir.push("casaverde/target/build/log");
+    log_dir.push("casaverde/build_output/linux/logs");
     fs::create_dir_all(&log_dir)?;
     Ok(log_dir)
 }

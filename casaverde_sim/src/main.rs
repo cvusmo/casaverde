@@ -1,6 +1,5 @@
 // Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 // github.com/cvusmo/casaverde/casaverde_sim
-// main.rs
 
 use casaverde_sim::sim::{run_simulation, Cell};
 use casaverde_utils::dirs::get_home_dir;
@@ -22,7 +21,8 @@ struct CellOutput {
 #[tokio::main]
 async fn main() -> Result<(), IoError> {
     let config_path = "config.toml";
-    let config: Value = toml::from_str(&read_to_string(config_path)?)?;
+    let config: Value = toml::from_str(&read_to_string(config_path)?)
+        .map_err(|e| new_error(IoErrorKind::Other, format!("TOML parsing error: {}", e)))?;
     let log_level = config.get("logging").and_then(|l| l.get("level")).and_then(|l| l.as_str())
         .map(|s| match s.to_lowercase().as_str() {
             "error" => LevelFilter::Error,
@@ -34,6 +34,7 @@ async fn main() -> Result<(), IoError> {
         })
         .unwrap_or(LevelFilter::Info);
     init_logger("casaverde_sim", log_level)?;
+
     let width = config.get("simulation").and_then(|s| s.get("width")).and_then(|w| w.as_integer()).unwrap_or(10) as usize;
     let height = config.get("simulation").and_then(|s| s.get("height")).and_then(|h| h.as_integer()).unwrap_or(10) as usize;
 

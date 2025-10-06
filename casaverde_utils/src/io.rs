@@ -1,15 +1,14 @@
 // Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 // github.com/cvusmo/casaverde/casaverde_utils
-// io.rs
 
 use std::io;
 
-/// Custom error type for casaverde_utils.
 #[derive(Debug)]
 pub enum IoError {
     Io(io::Error),
     Toml(toml::de::Error),
     SerdeJson(serde_json::Error),
+    Generic(Box<dyn std::error::Error>),
 }
 
 impl std::fmt::Display for IoError {
@@ -18,6 +17,7 @@ impl std::fmt::Display for IoError {
             IoError::Io(err) => write!(f, "IO error: {}", err),
             IoError::Toml(err) => write!(f, "TOML error: {}", err),
             IoError::SerdeJson(err) => write!(f, "JSON error: {}", err),
+            IoError::Generic(err) => write!(f, "Generic error: {}", err),
         }
     }
 }
@@ -28,6 +28,7 @@ impl std::error::Error for IoError {
             IoError::Io(err) => Some(err),
             IoError::Toml(err) => Some(err),
             IoError::SerdeJson(err) => Some(err),
+            IoError::Generic(err) => Some(err.as_ref()),
         }
     }
 }
@@ -50,10 +51,14 @@ impl From<serde_json::Error> for IoError {
     }
 }
 
-/// Re-export std::io::ErrorKind for compatibility.
+impl From<Box<dyn std::error::Error>> for IoError {
+    fn from(err: Box<dyn std::error::Error>) -> Self {
+        IoError::Generic(err)
+    }
+}
+
 pub use std::io::ErrorKind as IoErrorKind;
 
-/// Creates a new I/O error with the given kind and message.
 pub fn new_error(kind: IoErrorKind, message: impl Into<String>) -> IoError {
     IoError::Io(io::Error::new(kind, message.into()))
 }

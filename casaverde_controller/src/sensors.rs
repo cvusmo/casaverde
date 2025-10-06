@@ -1,4 +1,7 @@
+// Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
+// github.com/cvusmo/casaverde/casaverde_controller
 // src/sensors.rs
+
 use crate::controller::Command;
 use crate::models::DeviceReading;
 use crate::serial;
@@ -18,22 +21,25 @@ impl<'a> SensorController<'a> {
     }
 
     fn parse_float(resp: &str) -> Option<f32> {
-        resp.trim().parse::<f32>().ok()
+        resp.trim()
+            .split(':')
+            .nth(1)
+            .and_then(|s| s.trim().parse::<f32>().ok())
     }
 
     pub fn process_sensors(&mut self) -> Vec<DeviceReading> {
         let mut readings = Vec::new();
-        let mut moisture_on = false;
-
         let devices = [
-            ("blackbeard-cpu", Command::GetProbeTemp, Some(CPU_THRESHOLD)),
             (
                 "blackbeard-probe",
                 Command::GetProbeTemp,
                 Some(PROBE_THRESHOLD),
             ),
             ("moisture-1", Command::GetMoisture, Some(MOISTURE_THRESHOLD)),
-            ("water-1", Command::OpenValve, None),
+            ("nutrients-1", Command::GetMoisture, None),
+            ("humidity-1", Command::GetHumidity, Some(50.0)),
+            ("solar-1", Command::GetSolar, Some(100.0)),
+            ("water-1", Command::GetWater, None),
             ("relay-1", Command::TurnOnCooling, Some(CPU_THRESHOLD)),
             ("relay-2", Command::TurnOnRelay2, Some(PROBE_THRESHOLD)),
             ("relay-3", Command::TurnOnMoisture, Some(MOISTURE_THRESHOLD)),
@@ -41,15 +47,16 @@ impl<'a> SensorController<'a> {
         ];
 
         for (id, cmd, threshold) in devices.iter() {
-            let value = match *id {
-                "relay-3" | "water-1" => Some(rand::random::<f32>() * 100.0), // simulation
-                _ => match serial::send_serial_command(self.port, cmd) {
-                    Ok(resp) => Self::parse_float(&String::from_utf8_lossy(&resp)),
-                    Err(e) => {
-                        error!("Failed to read {}: {:?}", id, e);
-                        None
-                    }
-                },
+            let value = match serial::send_serial_command(self.port, cmd) {
+                Ok(resp) => {
+                    let resp_str = String::from_utf8_lossy(&resp);
+                    info!("Received response for {}: {}", id, resp_str);
+                    Self::parse_float(&resp_str)
+                }
+                Err(e) => {
+                    error!("Failed to read {}: {:?}", id, e);
+                    None
+                }
             };
 
             if let Some(v) = value {
@@ -76,8 +83,7 @@ impl<'a> SensorController<'a> {
                         let _ = serial::send_serial_command(self.port, &cmd_to_send);
                     }
                     "relay-3" => {
-                        moisture_on = v > MOISTURE_THRESHOLD;
-                        let cmd_to_send = if moisture_on {
+                        let cmd_to_send = if v > MOISTURE_THRESHOLD {
                             Command::TurnOnMoisture
                         } else {
                             Command::TurnOffMoisture

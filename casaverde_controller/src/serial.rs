@@ -1,4 +1,7 @@
+// Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
+// github.com/cvusmo/casaverde/casaverde_controller
 // src/serial.rs
+
 use crate::controller::Command;
 use casaverde_utils::log::{error, info};
 use serialport::{ClearBuffer, DataBits, Parity, StopBits};
@@ -33,17 +36,17 @@ pub fn send_serial_command(
     let command_str = match cmd {
         Command::TurnOnCooling => "SET FAN1 ON\n",
         Command::TurnOffCooling => "SET FAN1 OFF\n",
-        Command::TurnOnMoisture => "SET moisture-1 ON\n",
-        Command::TurnOffMoisture => "SET moisture-1 OFF\n",
+        Command::TurnOnMoisture => "SET relay-3 ON\n",
+        Command::TurnOffMoisture => "SET relay-3 OFF\n",
         Command::OpenValve => "SET water-1 OPEN\n",
         Command::CloseValve => "SET water-1 CLOSE\n",
-        Command::TurnOnRelay2 => "SET RELAY2 ON\n",
-        Command::TurnOffRelay2 => "SET RELAY2 OFF\n",
         Command::TurnOnSolar => "SET solar-1 ON\n",
         Command::TurnOffSolar => "SET solar-1 OFF\n",
-        Command::TurnOnHumidity => "SET humidity-1 ON\n",
-        Command::TurnOffHumidity => "SET humidity-1 OFF\n",
-        Command::GetProbeTemp => "GET blackbeard-probe\n",
+        Command::TurnOnHumidity => "SET relay-4 ON\n",
+        Command::TurnOffHumidity => "SET relay-4 OFF\n",
+        Command::TurnOnRelay2 => "SET relay-2 ON\n",
+        Command::TurnOffRelay2 => "SET relay-2 OFF\n",
+        Command::GetProbeTemp => "GET probe-temp\n",
         Command::GetMoisture => "GET moisture-1\n",
         Command::GetWater => "GET water-1\n",
         Command::GetHumidity => "GET humidity-1\n",

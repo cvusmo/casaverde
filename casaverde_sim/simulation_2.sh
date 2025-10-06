@@ -108,7 +108,7 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_OUTPUT="$PROJECT_ROOT/build_output/linux"
 CONTROLLER_DIR="$BUILD_OUTPUT/casaverde_controller"
 SERVER_DIR="$BUILD_OUTPUT/casaverde_server"
-SIM_LOG_DIR="$HOME/casaverde/target/build/log"
+SIM_LOG_DIR="$PROJECT_ROOT/build_output/linux/logs"
 SIM_BINARY=""
 SIM_PY=""
 SIM_MODE=""
@@ -124,6 +124,10 @@ if [[ "$SIM_MODE" != "arduino" ]]; then
     socat -d -d PTY,link=/tmp/virtualcom0,raw,echo=0 PTY,link=/tmp/virtualcom1,raw,echo=0 &> "$SOCAT_LOG" &
     SOCAT_PID=$!
     sleep 1
+    if ! ps -p "$SOCAT_PID" > /dev/null; then
+        log_with_timestamp "Error: Failed to start socat (PID $SOCAT_PID)"
+        exit 1
+    fi
     log_with_timestamp "Virtual ports created: /tmp/virtualcom0 <-> /tmp/virtualcom1 (PID $SOCAT_PID)"
 fi
 
