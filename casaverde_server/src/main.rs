@@ -1,25 +1,28 @@
 // Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 // github.com/cvusmo/casaverde/casaverde_server
+// src/main.rs
 
 use axum::{Router, routing::{get, post}};
 use axum_server::tls_rustls::RustlsConfig;
 use casaverde_server::handlers;
 use casaverde_utils::fs::read_to_string;
 use casaverde_utils::io::{new_error, IoError, IoErrorKind};
-use casaverde_utils::log::{info, LevelFilter};
 use casaverde_utils::init_logger;
-use std::path::PathBuf;
+use casaverde_utils::log::LevelFilter;
+use casaverde_utils::path::{get_cert_path, get_config_path, get_key_path, PathBuf};
 use toml::Value;
 use tokio::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), IoError> {
-    let config_path = PathBuf::from("config.toml");
-    info!("Loading config from: {:?}", config_path);
+    let config_path = get_config_path("casaverde_server")?;
+    println!("Loading config from: {:?}", config_path);
     let config: Value = toml::from_str(&read_to_string(&config_path)?)
         .map_err(|e| new_error(IoErrorKind::Other, format!("TOML parsing error: {}", e)))?;
-    info!("Config loaded: {:?}", config);
-    let log_level = config.get("logging").and_then(|l| l.get("level")).and_then(|l| l.as_str())
+    
+    let log_level = config.get("logging")
+        .and_then(|l| l.get("level"))
+        .and_then(|l| l.as_str())
         .map(|s| match s.to_lowercase().as_str() {
             "error" => LevelFilter::Error,
             "warn" => LevelFilter::Warn,
@@ -29,20 +32,18 @@ async fn main() -> Result<(), IoError> {
             _ => LevelFilter::Info,
         })
         .unwrap_or(LevelFilter::Info);
+
     init_logger("casaverde_server", log_level)?;
-    info!("Server started");
+    println!("Logger initialized");
 
-    let addr = server_addr(&config)?;
-    let cfg_dir = PathBuf::from(".");
-    std::fs::create_dir_all(&cfg_dir)
-        .map_err(|e| new_error(IoErrorKind::Other, format!("Failed to create config directory: {}", e)))?;
+    let addr = server_addr(&config)?; 
+    let crt = get_cert_path("casaverde_server")?;
+    let key = get_key_path("casaverde_server")?;
 
-    let crt = cfg_dir.join("server.crt");
-    let key = cfg_dir.join("server.key");
-    info!("Loading certificates: crt={:?}, key={:?}", crt, key);
     if !crt.exists() || !key.exists() {
         return Err(new_error(IoErrorKind::NotFound, "Certificates missing"));
     }
+
     let tls = RustlsConfig::from_pem_file(&crt, &key)
         .await
         .map_err(|e| new_error(IoErrorKind::Other, format!("TLS configuration error: {}", e)))?;
@@ -61,11 +62,12 @@ async fn main() -> Result<(), IoError> {
         .route("/configs/{controller_id}", get(handlers::get_configs))
         .route("/configs", post(handlers::post_configs));
 
-    info!("Starting server on: {}", addr);
+    println!("Starting server on: {}", addr);
     axum_server::bind_rustls(addr, tls)
         .serve(app.into_make_service())
         .await
         .map_err(|e| new_error(IoErrorKind::Other, format!("Server error: {}", e)))?;
+
     Ok(())
 }
 

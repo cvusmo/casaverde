@@ -62,7 +62,7 @@ fn render_ui(f: &mut Frame, app: &mut App) {
 
     let title = Paragraph::new("Casaverde")
         .block(Block::default().borders(Borders::ALL))
-        .style(Style::default().fg(Color::Green))
+        .style(Style::default().fg(Color::LightGreen))
         .alignment(Alignment::Center);
     f.render_widget(title, chunks[0]);
 
@@ -74,9 +74,26 @@ fn render_ui(f: &mut Frame, app: &mut App) {
 
     let status = Paragraph::new("q:quit ↑/↓:navigate Enter:toggle m/c/s:switch")
         .block(Block::default().borders(Borders::ALL))
-        .style(Style::default().fg(Color::Cyan))
+        .style(Style::default().fg(Color::LightCyan))
         .alignment(Alignment::Center);
     f.render_widget(status, chunks[2]);
+}
+
+fn get_sensor_name(id: &str) -> &str {
+    match id {
+        "ambient_temperature" => "Ambient Temperature",
+        "water_temperature" => "Water Temperature",
+        "solar-1" => "Solar Sensor 1",
+        "moisture-1" => "Moisture Sensor 1",
+        "nutrients-1" => "Nutrients Sensor 1",
+        "humidity-1" => "Humidity Sensor 1",
+        "water-1" => "Water Level Sensor 1",
+        "relay-1" => "Relay 1",
+        "relay-2" => "Relay 2",
+        "relay-3" => "Relay 3",
+        "relay-4" => "Relay 4",
+        _ => id,
+    }
 }
 
 fn render_devices(f: &mut Frame, area: Rect, app: &mut App) {
@@ -87,10 +104,16 @@ fn render_devices(f: &mut Frame, area: Rect, app: &mut App) {
         .enumerate()
         .map(|(i, d)| {
             let status = if d.active {
-                Span::styled("ON", Style::default().fg(Color::Green))
+                Span::styled(
+                    "ON",
+                    Style::default()
+                        .fg(Color::LightGreen)
+                        .add_modifier(Modifier::BOLD),
+                )
             } else {
                 Span::styled("OFF", Style::default().fg(Color::Red))
             };
+            let sensor_name = get_sensor_name(&d.id);
             let relay = app.sensor_data.config.iter().any(|c| {
                 c.current.controller_id == d.id
                     && c.current
@@ -99,9 +122,9 @@ fn render_devices(f: &mut Frame, area: Rect, app: &mut App) {
                         .map_or(false, |p| p.contains("relay"))
             });
             let label = if relay {
-                format!("Relay {} [{}] (Ctrl: {})", i + 1, status.content, d.id)
+                format!("Relay {} [{}] ({})", i + 1, status.content, sensor_name)
             } else {
-                format!("Sensor {} [{}] ({})", i + 1, status.content, d.id)
+                format!("Sensor {} [{}] ({})", i + 1, status.content, sensor_name)
             };
             ListItem::new(Line::from(Span::raw(label)))
         })
@@ -109,7 +132,12 @@ fn render_devices(f: &mut Frame, area: Rect, app: &mut App) {
 
     let list = List::new(items)
         .block(Block::default().title("Devices").borders(Borders::ALL))
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD))
+        .highlight_style(
+            Style::default()
+                .bg(Color::Yellow)
+                .fg(Color::Black)
+                .add_modifier(Modifier::BOLD),
+        )
         .highlight_symbol(">> ");
     f.render_stateful_widget(list, area, &mut app.list_state);
 }
@@ -121,12 +149,7 @@ fn render_monitoring(f: &mut Frame, area: Rect, app: &App) {
         .iter()
         .enumerate()
         .map(|(i, d)| {
-            let sensor_name = app
-                .sensor_data
-                .config
-                .iter()
-                .find(|c| c.current.controller_id == d.id)
-                .map_or(d.id.clone(), |c| c.current.controller_id.clone());
+            let sensor_name = get_sensor_name(&d.id);
             let sensor_type = app
                 .sensor_data
                 .config
@@ -155,7 +178,7 @@ fn render_monitoring(f: &mut Frame, area: Rect, app: &App) {
             let sensor_num = (i + 1).to_string();
             let reading = format!("{:.1}", d.value.unwrap_or_default());
             Row::new(vec![
-                Cell::from(Span::raw(sensor_name)),
+                Cell::from(Span::raw(sensor_name.to_string())),
                 Cell::from(Span::raw(sensor_type)),
                 Cell::from(Span::raw(sensor_num)),
                 Cell::from(Span::raw(reading)),
@@ -197,14 +220,16 @@ fn render_monitoring(f: &mut Frame, area: Rect, app: &App) {
 fn render_config(f: &mut Frame, area: Rect, app: &App) {
     let mut lines: Vec<Line> = vec![
         Line::from(Span::raw("# Configuration")),
-        Line::from(Span::raw("| Sensor ID | Type | Endpoint | Interval (s) | Serial Port | Light Relay ID | Light On (h) | Light Off (h) |")),
-        Line::from(Span::raw("|-----------|------|----------|--------------|-------------|-----------------|--------------|---------------|")),
+        Line::from(Span::raw("| Sensor ID           | Type        | Endpoint      | Interval (s) | Serial Port       | Light Relay ID | Light On (h) | Light Off (h) |")),
+        Line::from(Span::raw("|---------------------|-------------|---------------|--------------|-------------------|----------------|--------------|---------------|")),
     ];
     for cfg in &app.sensor_data.config {
         let line = format!(
-            "| {} | {} | N/A | N/A | {} | {} | {} | {} |",
+            "| {:<19} | {:<11} | {:<13} | {:<12} | {:<17} | {:<14} | {:<12} | {:<13} |",
             cfg.current.controller_id,
             cfg.current.serial_port.as_deref().unwrap_or("N/A"),
+            "N/A",
+            "N/A",
             cfg.current.serial_port.as_deref().unwrap_or("N/A"),
             cfg.current.light_relay_id,
             cfg.current.light_on_hours,
@@ -232,7 +257,7 @@ pub fn handle_input(app: &mut App) -> io::Result<()> {
                         if selected < app.sensor_data.devices.len() {
                             app.sensor_data.toggle_sensor(selected);
                             let device = &app.sensor_data.devices[selected];
-                            if let Some(cfg) = app.sensor_data.config.get(selected) {
+                            if let Some(_cfg) = app.sensor_data.config.get(selected) {
                                 let cmd = if device.active {
                                     format!("SET {} ON", device.id)
                                 } else {

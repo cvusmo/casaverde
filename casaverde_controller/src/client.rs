@@ -1,57 +1,55 @@
 // Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 // github.com/cvusmo/casaverde/casaverde_controller
-// src/client.rs - HTTP client setup and data fetching
+// src/client.rs
 
 use crate::config;
 use crate::config::Config;
 use crate::controller::Command;
 use crate::models::ConfigEntry;
 use casaverde_utils::log::{error, info};
+use casaverde_utils::path::{get_cert_path, PathBuf};
 use reqwest::{Client, Certificate};
-use serde::Serialize;
-use serde_json::Value;
+use serde::{Deserialize, Serialize};
 use std::fs;
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct CommandPayload {
     pub controller_id: String,
     pub commands: Vec<CommandData>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct CommandData {
     pub action: String,
     pub device_id: String,
 }
 
 pub fn build_secure_client() -> Result<Client, Box<dyn std::error::Error>> {
-    let cert_data = fs::read("server.crt").map_err(|e| {
-        error!("Failed to read server.crt: {e}");
+    let cert_path = get_cert_path("casaverde_controller")?;
+    let cert_data = fs::read(&cert_path).map_err(|e| {
+        error!("Failed to read server.crt at {:?}: {}", cert_path, e);
         e
     })?;
     let cert = Certificate::from_pem(&cert_data).map_err(|e| {
-        error!("Invalid certificate: {e}");
+        error!("Invalid certificate: {}", e);
         e
     })?;
-    info!("Certificate loaded successfully");
+    info!("Certificate loaded successfully from {:?}", cert_path);
 
-    // TODO: fix certs and hostname
     Ok(Client::builder()
         .add_root_certificate(cert)
-        .danger_accept_invalid_certs(true) // bypass
-        .danger_accept_invalid_hostnames(true) // bypass hostname
         .use_rustls_tls()
         .min_tls_version(reqwest::tls::Version::TLS_1_3)
         .build()
         .map_err(|e| {
-            error!("Failed to build secure client: {e}");
+            error!("Failed to build secure client: {}", e);
             e
         })?)
 }
 
-pub async fn fetch_readings(client: &Client, server: &str) -> Result<Value, Box<dyn std::error::Error>> {
+pub async fn fetch_readings(client: &Client, server: &str) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     let url = format!("{server}/temps");
-    let resp = client.get(&url).send().await?.json::<Value>().await?;
+    let resp = client.get(&url).send().await?.json::<serde_json::Value>().await?;
     info!("Fetched readings from {url}");
     Ok(resp)
 }
@@ -72,13 +70,13 @@ pub async fn fetch_config(client: &Client, server: &str, controller_id: &str) ->
 pub async fn simulation_commands(client: &Client, server: &str, is_simulation: bool) -> Result<(), Box<dyn std::error::Error>> {
     if is_simulation {
         let commands = vec![
-            CommandData { action: "GET".to_string(), device_id: "blackbeard-cpu".to_string() },
+            CommandData { action: "GET".to_string(), device_id: "ambient_temperature".to_string() },
             CommandData { action: "GET".to_string(), device_id: "solar-1".to_string() },
             CommandData { action: "GET".to_string(), device_id: "moisture-1".to_string() },
             CommandData { action: "GET".to_string(), device_id: "humidity-1".to_string() },
             CommandData { action: "GET".to_string(), device_id: "water-1".to_string() },
             CommandData { action: "GET".to_string(), device_id: "relay-1".to_string() },
-            CommandData { action: "GET".to_string(), device_id: "blackbeard-probe".to_string() },
+            CommandData { action: "GET".to_string(), device_id: "water_temperature".to_string() },
         ];
         let payload = CommandPayload {
             controller_id: config::get_hostname(),
@@ -116,7 +114,7 @@ pub async fn send_commands(client: &Client, server: &str, commands: &[Command]) 
             Command::TurnOnHumidity => CommandData { action: "ON".to_string(), device_id: "humidity-1".to_string() },
             Command::TurnOffHumidity => CommandData { action: "OFF".to_string(), device_id: "humidity-1".to_string() },
             Command::SetPWM(pwm) => CommandData { action: "SET".to_string(), device_id: format!("FAN1_{pwm}") },
-            Command::GetProbeTemp => CommandData { action: "GET".to_string(), device_id: "blackbeard-probe".to_string() },
+            Command::GetProbeTemp => CommandData { action: "GET".to_string(), device_id: "water_temperature".to_string() },
             Command::GetMoisture => CommandData { action: "GET".to_string(), device_id: "moisture-1".to_string() },
             Command::GetHumidity => CommandData { action: "GET".to_string(), device_id: "humidity-1".to_string() },
             Command::GetSolar => CommandData { action: "GET".to_string(), device_id: "solar-1".to_string() },
@@ -146,4 +144,34 @@ pub async fn send_sensor_data(
     let url = format!("{}/sensor_data", server);
     client.post(&url).json(reading).send().await?.error_for_status()?;
     Ok(())
+}
+
+pub async fn fetch_app_commands(client: &Client, server: &str, controller_id: &str) -> Result<Vec<Command>, Box<dyn std::error::Error>> {
+    let url = format!("{server}/commands?controller_id={controller_id}");
+    let resp = client.get(&url).send().await?.json::<Vec<CommandPayload>>().await?;
+    let mut commands = Vec::new();
+    for payload in resp {
+        if payload.controller_id == *controller_id {
+            for data in payload.commands {
+                let cmd = match (data.action.as_str(), data.device_id.as_str()) {
+                    ("ON", "FAN1") => Command::TurnOnCooling,
+                    ("OFF", "FAN1") => Command::TurnOffCooling,
+                    ("ON", "moisture-1") => Command::TurnOnMoisture,
+                    ("OFF", "moisture-1") => Command::TurnOffMoisture,
+                    ("OPEN", "water-1") => Command::OpenValve,
+                    ("CLOSE", "water-1") => Command::CloseValve,
+                    ("ON", "solar-1") => Command::TurnOnSolar,
+                    ("OFF", "solar-1") => Command::TurnOffSolar,
+                    ("ON", "humidity-1") => Command::TurnOnHumidity,
+                    ("OFF", "humidity-1") => Command::TurnOffHumidity,
+                    ("ON", "relay-2") => Command::TurnOnRelay2,
+                    ("OFF", "relay-2") => Command::TurnOffRelay2,
+                    _ => continue,
+                };
+                commands.push(cmd);
+            }
+        }
+    }
+    info!("Fetched {} app commands from {}", commands.len(), url);
+    Ok(commands)
 }

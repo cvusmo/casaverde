@@ -1,5 +1,6 @@
 // Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 // github.com/cvusmo/casaverde/casaverde_controller
+// src/main.rs
 
 use casaverde_controller::timer::run_light_timer;
 use casaverde_controller::{client, models};
@@ -7,6 +8,7 @@ use casaverde_utils::fs::{read_to_string, write_all};
 use casaverde_utils::io::{new_error, IoError, IoErrorKind};
 use casaverde_utils::log::{error, info, LevelFilter};
 use casaverde_utils::init_logger;
+use casaverde_utils::path::{get_config_path, PathBuf};
 use std::sync::Arc;
 use tokio::{spawn, sync::mpsc, time::interval};
 use casaverde_controller::config;
@@ -16,11 +18,10 @@ use casaverde_controller::serial::{init_serial, send_serial_command};
 use casaverde_controller::sensors::SensorController;
 use toml::Value;
 use std::fs::File;
-use std::path::PathBuf;
 
 #[tokio::main]
 async fn main() -> Result<(), IoError> {
-    let config_path = PathBuf::from("config.toml");
+    let config_path = get_config_path("casaverde_controller")?;
     info!("Loading config from: {:?}", config_path);
     let config_str = read_to_string(&config_path)
         .map_err(|e| new_error(IoErrorKind::Other, format!("Failed to read config.toml: {}", e)))?;
@@ -43,9 +44,14 @@ async fn main() -> Result<(), IoError> {
     let mut config = config::load_config()?;
     let client = client::build_secure_client()
         .map_err(|e| new_error(IoErrorKind::Other, format!("Failed to build secure client: {}", e)))?;
-    let port: Arc<tokio::sync::Mutex<Box<dyn serialport::SerialPort>>> =
-        Arc::new(tokio::sync::Mutex::new(init_serial(&config.serial_port.clone().unwrap_or_default())
-            .map_err(|e| new_error(IoErrorKind::Other, format!("Failed to initialize serial: {}", e)))?));
+    let port_result = init_serial(&config.serial_port.clone().unwrap_or_default());
+    let port = match port_result {
+        Ok(p) => Arc::new(tokio::sync::Mutex::new(p)),
+        Err(e) => {
+            error!("Serial init failed: {:?}. Running without serial.", e);
+            return Ok(());
+        }
+    };
 
     if let Ok(server_config) = client::fetch_config(&client, &config.server, &config.controller_id).await {
         config = server_config;
@@ -102,7 +108,7 @@ async fn main() -> Result<(), IoError> {
         let cpu_temp = gpio::read_temperature();
         let mut full_readings = readings.clone();
         full_readings.push(models::DeviceReading {
-            id: "blackbeard-cpu".to_string(),
+            id: "ambient_temperature".to_string(),
             value: cpu_temp,
         });
         let sensor_payload = models::SensorReading {
@@ -124,8 +130,18 @@ async fn main() -> Result<(), IoError> {
         let remote_commands = process_remote_readings(&remote_readings, &config.controller_id);
         let local_commands = process_local_rules(&config, cpu_temp.unwrap_or_default().into());
         for cmd in remote_commands.into_iter().chain(local_commands.into_iter()) {
+            info!("Enqueuing command: {:?}", cmd);
             if let Err(e) = cmd_tx.send(cmd).await {
                 error!("Failed to enqueue command: {}", e);
+            }
+        }
+
+        if let Ok(app_commands) = client::fetch_app_commands(&client, &config.server, &config.controller_id).await {
+            for cmd in app_commands {
+                info!("Enqueued app override command: {:?}", cmd);
+                if let Err(e) = cmd_tx.send(cmd).await {
+                    error!("Failed to enqueue app command: {}", e);
+                }
             }
         }
     }

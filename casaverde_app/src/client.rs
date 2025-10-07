@@ -5,8 +5,10 @@
 use std::error::Error;
 use crate::models::{ConfigEntry};
 use casaverde_utils::log::{error, info, warn};
-use reqwest::Client;
+use casaverde_utils::path::{get_cert_path, PathBuf};
+use reqwest::{Client, Certificate};
 use serde::Serialize;
+use std::fs;
 use std::time::Instant;
 
 #[derive(Clone)]
@@ -19,13 +21,18 @@ pub struct AppClient {
 
 impl AppClient {
     pub fn new(server: &str, client_id: String) -> Self {
+        let cert_path = get_cert_path("casaverde_app").expect("Failed to get certificate path");
+        let cert_data = fs::read(&cert_path).expect("Failed to read server.crt");
+        let cert = Certificate::from_pem(&cert_data).expect("Invalid certificate");
+        info!("Certificate loaded successfully from {:?}", cert_path);
+
         let client = Client::builder()
+            .add_root_certificate(cert)
             .use_rustls_tls()
             .min_tls_version(reqwest::tls::Version::TLS_1_3)
-            .danger_accept_invalid_certs(true) // FOR TESTING ONLY
-            .danger_accept_invalid_hostnames(true) // FOR TESTING ONLY
             .build()
             .expect("Failed to build secure client");
+
         Self {
             client,
             server: server.to_string(),
@@ -70,5 +77,23 @@ impl AppClient {
     pub async fn fetch_controller_config(&self, controller_id: &str) -> Option<ConfigEntry> {
         let url = format!("{}/configs/{}", self.server, controller_id);
         self.client.get(&url).send().await.ok()?.json().await.ok()
+    }
+
+    pub async fn fetch_device_value(&self, id: &str) -> Option<f32> {
+        let url = format!("{}/sensor_data", self.server);
+        if let Ok(resp) = self.client.get(&url).send().await {
+            if let Ok(data) = resp.json::<serde_json::Value>().await {
+                if let Some(devices) = data.as_array() {
+                    for device in devices {
+                        if let Some(dev) = device.as_object() {
+                            if dev.get("id").and_then(|v| v.as_str()) == Some(id) {
+                                return dev.get("value").and_then(|v| v.as_f64()).map(|v| v as f32);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        None
     }
 }

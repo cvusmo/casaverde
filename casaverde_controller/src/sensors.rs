@@ -46,10 +46,11 @@ impl<'a> SensorController<'a> {
             ("relay-4", Command::TurnOnHumidity, Some(50.0)),
         ];
 
-        for (id, cmd, threshold) in devices.iter() {
+        for (id, cmd, _threshold) in devices.iter() {
+            // Fixed unused
             let value = match serial::send_serial_command(self.port, cmd) {
                 Ok(resp) => {
-                    let resp_str = String::from_utf8_lossy(&resp);
+                    let resp_str = String::from_utf8_lossy(&resp).to_string();
                     info!("Received response for {}: {}", id, resp_str);
                     Self::parse_float(&resp_str)
                 }
@@ -65,40 +66,21 @@ impl<'a> SensorController<'a> {
                     value: Some(v),
                 });
 
-                match *id {
-                    "relay-1" => {
-                        let cmd_to_send = if v > CPU_THRESHOLD {
-                            Command::TurnOnCooling
-                        } else {
-                            Command::TurnOffCooling
-                        };
-                        let _ = serial::send_serial_command(self.port, &cmd_to_send);
-                    }
-                    "relay-2" => {
-                        let cmd_to_send = if v > PROBE_THRESHOLD {
-                            Command::TurnOnRelay2
-                        } else {
-                            Command::TurnOffRelay2
-                        };
-                        let _ = serial::send_serial_command(self.port, &cmd_to_send);
-                    }
-                    "relay-3" => {
-                        let cmd_to_send = if v > MOISTURE_THRESHOLD {
-                            Command::TurnOnMoisture
-                        } else {
-                            Command::TurnOffMoisture
-                        };
-                        let _ = serial::send_serial_command(self.port, &cmd_to_send);
-                    }
-                    "relay-4" => {
-                        let cmd_to_send = if v > 50.0 {
-                            Command::TurnOnHumidity
-                        } else {
-                            Command::TurnOffHumidity
-                        };
-                        let _ = serial::send_serial_command(self.port, &cmd_to_send);
-                    }
-                    _ => {}
+                let cmd_to_send = match *id {
+                    "relay-1" if v > CPU_THRESHOLD => Command::TurnOnCooling,
+                    "relay-1" => Command::TurnOffCooling,
+                    "relay-2" if v > PROBE_THRESHOLD => Command::TurnOnRelay2,
+                    "relay-2" => Command::TurnOffRelay2,
+                    "relay-3" if v > MOISTURE_THRESHOLD => Command::TurnOnMoisture,
+                    "relay-3" => Command::TurnOffMoisture,
+                    "relay-4" if v > 50.0 => Command::TurnOnHumidity,
+                    "relay-4" => Command::TurnOffHumidity,
+                    _ => continue,
+                };
+                if let Err(e) = serial::send_serial_command(self.port, &cmd_to_send) {
+                    error!("Failed to send command for {}: {:?}", id, e);
+                } else {
+                    info!("Sent command for {}: {:?}", id, cmd_to_send);
                 }
             } else {
                 error!("Failed to parse value for {}", id);

@@ -2,11 +2,12 @@
 // github.com/cvusmo/casaverde/casaverde_controller
 // src/controller.rs
 
+use casaverde_utils::log::info;
 use serde_json::Value;
 
 #[derive(Debug, Clone)]
 pub enum Command {
-    TurnOnCooling,
+    TurnOnCooling, // Pin 2: ambient
     TurnOffCooling,
     TurnOnMoisture,
     TurnOffMoisture,
@@ -17,12 +18,12 @@ pub enum Command {
     TurnOnHumidity,
     TurnOffHumidity,
     SetPWM(u8),
-    GetProbeTemp,
+    GetProbeTemp, // Pin 6: water temp
     GetMoisture,
     GetHumidity,
     GetSolar,
     GetWater,
-    TurnOnRelay2,
+    TurnOnRelay2, // Pin 3: water
     TurnOffRelay2,
 }
 
@@ -53,7 +54,9 @@ pub fn process_remote_readings(readings: &Value, controller_id: &str) -> Vec<Com
                 .iter()
                 .filter_map(|client_reading| {
                     let arr: &[Value] = client_reading.as_array()?.as_slice();
-                    let [id, devices] = arr else { return None };
+                    let [id, devices] = arr else {
+                        return None;
+                    };
                     (id.as_str() == Some(controller_id)).then(|| {
                         devices
                             .as_array()
@@ -64,17 +67,21 @@ pub fn process_remote_readings(readings: &Value, controller_id: &str) -> Vec<Com
                                         device.as_object().and_then(|obj| {
                                             let id = obj.get("id")?.as_str()?;
                                             let value = obj.get("value")?.as_f64()?;
+                                            info!(
+                                                "Processing remote reading for {}: {}",
+                                                id, value
+                                            );
                                             match id {
-                                                "blackbeard-cpu" if value > 40.0 => {
+                                                "ambient_temperature" if value > 40.0 => {
                                                     Some(Command::TurnOnCooling)
-                                                }
-                                                "blackbeard_cpu" if value < 40.0 => {
+                                                } // Pin 2
+                                                "ambient_temperature" if value < 40.0 => {
                                                     Some(Command::TurnOffCooling)
                                                 }
-                                                "blackbeard-probe" if value > 15.0 => {
+                                                "water_temperature" if value > 15.0 => {
                                                     Some(Command::TurnOnRelay2)
-                                                }
-                                                "blackbeard-probe" if value <= 15.0 => {
+                                                } // Pin 3
+                                                "water_temperature" if value <= 15.0 => {
                                                     Some(Command::TurnOffRelay2)
                                                 }
                                                 "moisture-1" if value < 30.0 => {
@@ -119,12 +126,12 @@ pub fn process_remote_readings(readings: &Value, controller_id: &str) -> Vec<Com
 pub fn process_local_rules(_config: &crate::config::Config, local_temp: f64) -> Vec<Command> {
     let mut commands = Vec::new();
     if local_temp > 40.0 {
-        commands.push(Command::TurnOnCooling);
+        commands.push(Command::TurnOnCooling); // Pin 2
     } else if local_temp < 40.0 {
         commands.push(Command::TurnOffCooling);
     }
     // Periodic queries for all sensors
-    commands.push(Command::GetProbeTemp);
+    commands.push(Command::GetProbeTemp); // Pin 6
     commands.push(Command::GetMoisture);
     commands.push(Command::GetHumidity);
     commands.push(Command::GetSolar);

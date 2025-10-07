@@ -8,12 +8,23 @@ use crate::io::{new_error, IoError, IoErrorKind};
 use chrono::Local;
 use env_logger::{Builder, Target};
 use log::LevelFilter;
+use std::fs;
 use std::io::Write;
 
 pub fn init_logger(app_name: &str, level: LevelFilter) -> Result<(), IoError> {
     let log_dir = get_casaverde_log_dir()
         .map_err(|e| new_error(IoErrorKind::NotFound, format!("Log directory error: {}", e)))?;
-    let log_path = log_dir.join(format!("{}.log", app_name));
+
+    // Timestamped log file (unique per run)
+    let timestamp = Local::now().format("%Y%m%d-%H%M%S");
+    let log_path = log_dir.join(format!("{}_{}.log", app_name, timestamp));
+
+    // Symlink for quick access to latest log
+    let latest_link = log_dir.join(format!("{}_latest.log", app_name));
+    if latest_link.exists() {
+        let _ = fs::remove_file(&latest_link);
+    }
+    let _ = std::os::unix::fs::symlink(&log_path, &latest_link);
 
     let file = create_file(&log_path).map_err(|e| {
         new_error(

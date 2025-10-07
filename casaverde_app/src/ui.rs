@@ -1,4 +1,4 @@
-// Copyright 2026 Acris Software Ltd. Co. All Rights Reserved.
+// Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 // github.com/cvusmo/casaverde/casaverde_app
 // src/ui.rs
 

@@ -11,10 +11,7 @@ edition.workspace = true
 [dependencies]
 clap.workspace = true
 crossterm.workspace = true
-#env_logger.workspace = true
-#log.workspace = true
 ratatui.workspace = true
-#regex.workspace = true
 reqwest.workspace = true
 rustls.workspace = true
 rustls-pemfile.workspace = true
@@ -27,7 +24,7 @@ toml.workspace = true
 twox-hash.workspace = true
 uuid.workspace = true
 casaverde_utils = { path = "../casaverde_utils" }
-casaverde_sim = { path = "../casaverde_sim" }
+# Removed casaverde_sim
 
 [[bin]]
 name = "casaverde_app"

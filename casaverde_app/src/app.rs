@@ -4,13 +4,10 @@
 
 use ratatui::widgets::ListState;
 use crate::devices::DeviceData;
-use casaverde_sim::sim::{run_simulation, Cell};
 use casaverde_utils::log::error;
 use crossterm::event::{self, Event, KeyCode};
 use std::io;
 use std::time::{Duration, Instant};
-use tokio::sync::mpsc;
-use tokio::task;
 
 const POLL_INTERVAL: Duration = Duration::from_millis(100);
 const DEVICE_REFRESH_INTERVAL: Duration = Duration::from_secs(2);
@@ -25,7 +22,6 @@ pub enum Screen {
 pub struct App {
     pub sensor_data: DeviceData,
     pub selected: usize,
-    pub simulation_rx: mpsc::Receiver<Vec<Cell>>,
     pub running: bool,
     pub screen: Screen,
     pub quit: bool,
@@ -37,14 +33,9 @@ impl App {
         let mut list_state = ListState::default();
         list_state.select(Some(0));
         let sensor_data = DeviceData::new(config_path, server);
-        let (tx, rx) = mpsc::channel::<Vec<Cell>>(8);
-
-        task::spawn(run_simulation(tx, 8, 8));
-
         Self {
             sensor_data,
             selected: 0,
-            simulation_rx: rx,
             running: true,
             screen: Screen::Devices,
             quit: false,
@@ -55,17 +46,6 @@ impl App {
     pub async fn update(&mut self) {
         if let Err(e) = self.sensor_data.update_devices().await {
             error!("Device update failed: {:?}", e);
-        }
-
-        if let Ok(Some(sim_data)) =
-            tokio::time::timeout(Duration::from_millis(10), self.simulation_rx.recv()).await
-        {
-            let avg_height: f32 =
-                sim_data.iter().map(|c| c.plant_height).sum::<f32>() / sim_data.len() as f32;
-
-            if !self.sensor_data.devices.is_empty() {
-                self.sensor_data.devices[0].value = Some(avg_height * 100.0);
-            }
         }
     }
 

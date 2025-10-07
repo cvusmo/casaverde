@@ -3,7 +3,7 @@
 // src/serial.rs
 
 use crate::controller::Command;
-use casaverde_utils::log::{error, info};
+use casaverde_utils::log::{error, info, warn};
 use serialport::{ClearBuffer, DataBits, Parity, StopBits};
 use std::time::Duration;
 
@@ -17,8 +17,12 @@ pub fn init_serial(port_name: &str) -> Result<Box<dyn serialport::SerialPort>, s
 
     match port {
         Ok(p) => {
-            p.clear(ClearBuffer::Input)?;
-            p.clear(ClearBuffer::Output)?;
+            if let Err(e) = p.clear(ClearBuffer::Input) {
+                warn!("Failed to clear input buffer: {:?}", e);
+            }
+            if let Err(e) = p.clear(ClearBuffer::Output) {
+                warn!("Failed to clear output buffer: {:?}", e);
+            }
             info!("Serial port {} initialized at 9600 baud", port_name);
             Ok(p)
         }
@@ -52,12 +56,6 @@ pub fn send_serial_command(
         Command::GetHumidity => "GET humidity-1\n",
         Command::GetSolar => "GET solar-1\n",
         Command::SetPWM(pwm) => Box::leak(format!("SET FAN1 PWM_{}\n", pwm).into_boxed_str()),
-        _ => {
-            return Err(serialport::Error::new(
-                serialport::ErrorKind::InvalidInput,
-                "Unknown command",
-            ))
-        }
     };
 
     port.write_all(command_str.as_bytes())?;

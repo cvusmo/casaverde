@@ -1,0 +1,13 @@
+# Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
+# github.com/cvusmo/casaverde/casaverde_controller
+# config.toml
+
+server = "https://localhost:3003"
+hostname = "localhost"
+controller_id = "blackbeard-pi"
+serial_port = "/dev/ttyACM0"
+light_relay_id = "relay-1"
+light_on_hours = 16
+light_off_hours = 8
+[logging]
+level = "info"
