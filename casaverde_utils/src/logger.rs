@@ -15,11 +15,18 @@ pub fn init_logger(app_name: &str, level: LevelFilter) -> Result<(), IoError> {
     let log_dir = get_casaverde_log_dir()
         .map_err(|e| new_error(IoErrorKind::NotFound, format!("Log directory error: {}", e)))?;
 
-    // Timestamped log file (unique per run)
+    if !log_dir.exists() {
+        fs::create_dir_all(&log_dir).map_err(|e| {
+            new_error(
+                IoErrorKind::Other,
+                format!("Failed to create log directory: {}", e),
+            )
+        })?;
+    }
+
     let timestamp = Local::now().format("%Y%m%d-%H%M%S");
     let log_path = log_dir.join(format!("{}_{}.log", app_name, timestamp));
 
-    // Symlink for quick access to latest log
     let latest_link = log_dir.join(format!("{}_latest.log", app_name));
     if latest_link.exists() {
         let _ = fs::remove_file(&latest_link);

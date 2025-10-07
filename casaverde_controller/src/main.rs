@@ -1,3 +1,4 @@
+
 // Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 // github.com/cvusmo/casaverde/casaverde_controller
 // src/main.rs
@@ -8,7 +9,7 @@ use casaverde_utils::fs::{read_to_string, write_all};
 use casaverde_utils::io::{new_error, IoError, IoErrorKind};
 use casaverde_utils::log::{error, info, LevelFilter};
 use casaverde_utils::init_logger;
-use casaverde_utils::path::{get_config_path, PathBuf};
+use casaverde_utils::path::get_config_path;
 use std::sync::Arc;
 use tokio::{spawn, sync::mpsc, time::interval};
 use casaverde_controller::config;
@@ -21,14 +22,21 @@ use std::fs::File;
 
 #[tokio::main]
 async fn main() -> Result<(), IoError> {
-    let config_path = get_config_path("casaverde_controller")?;
-    info!("Loading config from: {:?}", config_path);
+    let config_path = get_config_path("casaverde_controller");
+    println!("Attempting to load config from: {:?}", config_path);
+    if !config_path.exists() {
+        println!("Config file does not exist at: {:?}", config_path);
+    }
     let config_str = read_to_string(&config_path)
         .map_err(|e| new_error(IoErrorKind::Other, format!("Failed to read config.toml: {}", e)))?;
     let config_toml: Value = toml::from_str(&config_str)
         .map_err(|e| new_error(IoErrorKind::Other, format!("Failed to parse config.toml: {}", e)))?;
     info!("Config loaded: {:?}", config_toml);
-    let log_level = config_toml.get("logging").and_then(|l| l.get("level")).and_then(|l| l.as_str())
+
+    let log_level = config_toml
+        .get("logging")
+        .and_then(|l| l.get("level"))
+        .and_then(|l| l.as_str())
         .map(|s| match s.to_lowercase().as_str() {
             "error" => LevelFilter::Error,
             "warn" => LevelFilter::Warn,
@@ -38,14 +46,17 @@ async fn main() -> Result<(), IoError> {
             _ => LevelFilter::Info,
         })
         .unwrap_or(LevelFilter::Info);
+
     init_logger("casaverde_controller", log_level)?;
     info!("Starting casaverde_controller on {}", config::get_hostname());
 
     let mut config = config::load_config()?;
+    println!("Serial port from config: {:?}", config.serial_port);
+
     let client = client::build_secure_client()
         .map_err(|e| new_error(IoErrorKind::Other, format!("Failed to build secure client: {}", e)))?;
-    let port_result = init_serial(&config.serial_port.clone().unwrap_or_default());
-    let port = match port_result {
+
+    let port = match init_serial(&config.serial_port.clone().unwrap_or_default()) {
         Ok(p) => Arc::new(tokio::sync::Mutex::new(p)),
         Err(e) => {
             error!("Serial init failed: {:?}. Running without serial.", e);
@@ -68,10 +79,7 @@ async fn main() -> Result<(), IoError> {
 
     let (cmd_tx, mut cmd_rx) = mpsc::channel::<Command>(100);
 
-    let on_hours = config.light_on_hours;
-    let off_hours = config.light_off_hours;
-    let tx = cmd_tx.clone();
-    spawn(run_light_timer(String::new(), on_hours, off_hours, tx));
+    spawn(run_light_timer(String::new(), config.light_on_hours, config.light_off_hours, cmd_tx.clone()));
 
     let port_clone = port.clone();
     let client_clone = client.clone();
@@ -120,6 +128,7 @@ async fn main() -> Result<(), IoError> {
         } else {
             info!("Sent sensor data to server: {:?}", sensor_payload);
         }
+
         let remote_readings = match client::fetch_readings(&client, &config.server).await {
             Ok(r) => r,
             Err(e) => {
@@ -127,6 +136,7 @@ async fn main() -> Result<(), IoError> {
                 continue;
             }
         };
+
         let remote_commands = process_remote_readings(&remote_readings, &config.controller_id);
         let local_commands = process_local_rules(&config, cpu_temp.unwrap_or_default().into());
         for cmd in remote_commands.into_iter().chain(local_commands.into_iter()) {

@@ -5,7 +5,7 @@
 use std::error::Error;
 use crate::models::{ConfigEntry};
 use casaverde_utils::log::{error, info, warn};
-use casaverde_utils::path::{get_cert_path, PathBuf};
+use casaverde_utils::path::get_cert_path;
 use reqwest::{Client, Certificate};
 use serde::Serialize;
 use std::fs;

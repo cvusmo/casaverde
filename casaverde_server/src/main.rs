@@ -9,17 +9,18 @@ use casaverde_utils::fs::read_to_string;
 use casaverde_utils::io::{new_error, IoError, IoErrorKind};
 use casaverde_utils::init_logger;
 use casaverde_utils::log::LevelFilter;
-use casaverde_utils::path::{get_cert_path, get_config_path, get_key_path, PathBuf};
+use casaverde_utils::path::{get_cert_path, get_config_path, get_key_path};
 use toml::Value;
 use tokio::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), IoError> {
-    let config_path = get_config_path("casaverde_server")?;
+    let config_path = get_config_path("casaverde_server");
     println!("Loading config from: {:?}", config_path);
+
     let config: Value = toml::from_str(&read_to_string(&config_path)?)
         .map_err(|e| new_error(IoErrorKind::Other, format!("TOML parsing error: {}", e)))?;
-    
+
     let log_level = config.get("logging")
         .and_then(|l| l.get("level"))
         .and_then(|l| l.as_str())
@@ -36,7 +37,7 @@ async fn main() -> Result<(), IoError> {
     init_logger("casaverde_server", log_level)?;
     println!("Logger initialized");
 
-    let addr = server_addr(&config)?; 
+    let addr = server_addr(&config)?;
     let crt = get_cert_path("casaverde_server")?;
     let key = get_key_path("casaverde_server")?;
 

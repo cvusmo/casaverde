@@ -69,7 +69,7 @@ copy_certificates() {
     local project_dir="${BUILD_OUTPUT}/linux/$project"
     mkdir -p "$project_dir" || { log_with_timestamp "Failed to create directory: $project_dir"; exit 1; }
 
-    # Copy certificate for all projects
+    # Copy certificate for all projects (to be safe until TLS needs are confirmed)
     cp "$cert_source" "$project_dir/server.crt" 2>&1 | tee -a "$BUILD_LOG" || {
       log_with_timestamp "Failed copying cert to $project_dir/server.crt"; exit 1;
     }
@@ -174,7 +174,6 @@ verify_paths() {
 
     log_with_timestamp "Verifying paths for $project..."
     [[ -f "$config_path" ]] || { log_with_timestamp "Config not found: $config_path"; exit 1; }
-    # Only check for server.crt and server.key for casaverde_server
     if [[ "$project" == "casaverde_server" ]]; then
       [[ -f "$cert_path" ]] || { log_with_timestamp "Certificate not found: $cert_path"; exit 1; }
       [[ -f "$key_path" ]] || { log_with_timestamp "Key not found: $key_path"; exit 1; }
@@ -204,9 +203,8 @@ build_project() {
   esac
 
   export HOSTNAME="$project_hostname"
-  log_with_timestamp "HOSTNAME set to $HOSTNAME for $project build"
+  log_with_timestamp "Starting compilation for $project in $mode mode..."
 
-  log_with_timestamp "Checking for uncommitted changes in $project..."
   pushd "$PROJECT_ROOT/$project" >/dev/null || {
     log_with_timestamp "Directory not found: ${PROJECT_ROOT}/${project}"
     exit 1
@@ -235,13 +233,13 @@ build_project() {
     fi
   fi
 
-  log_with_timestamp "Building $project for $target in $mode mode..."
+  # Run cargo build and filter output for casaverde projects, warnings, and errors
   local cargo_args="--target $target"
   [[ "$mode" == "release" ]] && cargo_args="$cargo_args --release"
   if [[ "$use_cross" == "true" ]]; then
-    cross build $cargo_args 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Build failed for $project"; exit 1; }
+    cross build $cargo_args 2>&1 | grep -E "(warning:|error:|casaverde_|Finished)" | tee -a "$BUILD_LOG" || { log_with_timestamp "Build failed for $project"; exit 1; }
   else
-    cargo build $cargo_args 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Build failed for $project"; exit 1; }
+    cargo build $cargo_args 2>&1 | grep -E "(warning:|error:|casaverde_|Finished)" | tee -a "$BUILD_LOG" || { log_with_timestamp "Build failed for $project"; exit 1; }
   fi
 
   popd >/dev/null
@@ -280,7 +278,6 @@ main() {
 
   case "$action" in
     "debug")
-      cargo build --verbose --manifest-path "$PROJECT_ROOT/Cargo.toml" --target "${TARGETS[linux]}" --all 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Workspace build failed"; exit 1; }
       for project in casaverde_server casaverde_controller casaverde_app; do
         build_project "$project" "debug" "${TARGETS[linux]}" "${BUILD_OUTPUT}/linux" "false"
       done
@@ -288,7 +285,6 @@ main() {
       log_with_timestamp "Debug build complete"
       ;;
     "release")
-      cargo build --verbose --manifest-path "$PROJECT_ROOT/Cargo.toml" --target "${TARGETS[linux]}" --release --all 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Workspace build failed"; exit 1; }
       for project in casaverde_server casaverde_controller casaverde_app; do
         build_project "$project" "release" "${TARGETS[linux]}" "${BUILD_OUTPUT}/linux" "false"
       done
@@ -298,7 +294,6 @@ main() {
     "deploy")
       MODE="debug"
       TARGET="${TARGETS[linux]}"
-      cargo build --verbose --manifest-path "$PROJECT_ROOT/Cargo.toml" --target "$TARGET" --all 2>&1 | tee -a "$BUILD_LOG" || { log_with_timestamp "Workspace build failed"; exit 1; }
       for project in casaverde_server casaverde_controller casaverde_app; do
         build_project "$project" "$MODE" "$TARGET" "${BUILD_OUTPUT}/linux" "false"
         deploy_project "$project" "${BUILD_OUTPUT}/linux" "$MODE"
@@ -327,7 +322,7 @@ main() {
 
     if [[ -x "$SERVER_BIN" ]]; then
       SERVER_RUN_LOG="${LOG_DIR}/casaverde_server.log"
-      (cd "${PROJECT_ROOT}" && nohup "${SERVER_BIN}" &>> "${SERVER_RUN_LOG}" &)
+      (cd "${BUILD_OUTPUT}/linux/casaverde_server" && nohup "./casaverde_server" &>> "${SERVER_RUN_LOG}" &)
       sleep 1
       SERVER_PID=$(pgrep -f "${SERVER_BIN}" | head -n 1)
       if [[ -n "$SERVER_PID" && $(ps -p "$SERVER_PID" > /dev/null && echo "running") == "running" ]]; then
@@ -341,7 +336,7 @@ main() {
 
     if [[ -x "$CONTROLLER_BIN" ]]; then
       CONTROLLER_RUN_LOG="${LOG_DIR}/casaverde_controller.log"
-      (cd "${PROJECT_ROOT}" && nohup "${CONTROLLER_BIN}" &>> "${CONTROLLER_RUN_LOG}" &)
+      (cd "${BUILD_OUTPUT}/linux/casaverde_controller" && nohup "./casaverde_controller" &>> "${CONTROLLER_RUN_LOG}" &)
       sleep 1
       CONTROLLER_PID=$(pgrep -f "${CONTROLLER_BIN}" | head -n 1)
       if [[ -n "$CONTROLLER_PID" && $(ps -p "$CONTROLLER_PID" > /dev/null && echo "running") == "running" ]]; then
@@ -356,17 +351,17 @@ main() {
     echo
     log_with_timestamp "✅ Server and controller running in background."
     echo "Reminder: To start the Casaverde App manually, run:"
-    echo "  cd ${PROJECT_ROOT} && ${APP_BIN}"
+    echo "  cd ${BUILD_OUTPUT}/linux/casaverde_app && ./casaverde_app"
     echo
   else
     echo
     log_with_timestamp "Skipping auto-start."
     echo "Manually start with:"
-    echo "  cd ${PROJECT_ROOT} && ${SERVER_BIN}"
-    echo "  cd ${PROJECT_ROOT} && ${CONTROLLER_BIN}"
+    echo "  cd ${BUILD_OUTPUT}/linux/casaverde_server && ./casaverde_server"
+    echo "  cd ${BUILD_OUTPUT}/linux/casaverde_controller && ./casaverde_controller"
     echo
     echo "Then run the Casaverde App with:"
-    echo "  cd ${PROJECT_ROOT} && ${APP_BIN}"
+    echo "  cd ${BUILD_OUTPUT}/linux/casaverde_app && ./casaverde_app"
     echo
   fi
 }

@@ -8,7 +8,7 @@ use casaverde_utils::fs::read_to_string;
 use casaverde_utils::io::{new_error, IoError, IoErrorKind};
 use casaverde_utils::log::{error, info, LevelFilter};
 use casaverde_utils::init_logger;
-use casaverde_utils::path::{get_config_path, PathBuf};
+use casaverde_utils::path::get_config_path;
 use clap::Parser;
 use toml::Value;
 
@@ -25,8 +25,9 @@ async fn main() -> Result<(), IoError> {
     }
     info!("Starting casaverde_app...");
 
-    let config_path = get_config_path("casaverde_app")?;
+    let config_path = get_config_path("casaverde_app");
     info!("Loading config from: {:?}", config_path);
+
     let config_str = read_to_string(&config_path)
         .map_err(|e| new_error(IoErrorKind::Other, format!("Failed to read config.toml: {}", e)))?;
     let config: Value = toml::from_str(&config_str)
@@ -60,15 +61,17 @@ async fn main() -> Result<(), IoError> {
     run_tui_mode(&server, &config_path).await
 }
 
-async fn run_tui_mode(server: &str, config_path: &PathBuf) -> Result<(), IoError> {
+async fn run_tui_mode(server: &str, config_path: &std::path::Path) -> Result<(), IoError> {
     let mut tui = Tui::new()?;
     tui.enter()?;
-    let mut app = App::new(config_path.to_str().ok_or_else(|| {
-        new_error(IoErrorKind::Other, "Invalid config path")
-    })?, server);
+    let mut app = App::new(
+        config_path.to_str().ok_or_else(|| new_error(IoErrorKind::Other, "Invalid config path"))?,
+        server,
+    );
     if let Err(e) = run_app(&mut tui, &mut app).await {
         error!("Application error: {:?}", e);
     }
     tui.exit()?;
     Ok(())
 }
+
