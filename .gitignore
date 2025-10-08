@@ -64,6 +64,7 @@ build/
 Thumbs.db
 
 # --- Simulation / local-only data ---
+/casaverde_sim
 /casaverde_sim/data/
 /casaverde_sim/output/
 /casaverde_app/test_data/
