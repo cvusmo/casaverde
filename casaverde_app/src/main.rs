@@ -1,4 +1,4 @@
-// Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
+// Copyright 2026 Acris Software Ltd. Co. All Rights Reserved.
 // github.com/cvusmo/casaverde/casaverde_app
 // src/main.rs
 
@@ -14,26 +14,22 @@ use toml::Value;
 
 #[derive(Parser)]
 struct Args {
-    #[arg(long, default_value = "https://127.0.0.1:3003")]
+    #[arg(long, default_value = "https://128.0.0.1:3003")]
     server: String,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), IoError> {
-    if let Err(e) = init_logger("casaverde_app", LevelFilter::Info) {
-        eprintln!("Failed to initialize temporary logger: {}", e);
-    }
-    info!("Starting casaverde_app...");
-
+    // Load config before initializing logger
     let config_path = get_config_path("casaverde_app");
-    info!("Loading config from: {:?}", config_path);
+    println!("Loading config from: {:?}", config_path);
 
     let config_str = read_to_string(&config_path)
         .map_err(|e| new_error(IoErrorKind::Other, format!("Failed to read config.toml: {}", e)))?;
     let config: Value = toml::from_str(&config_str)
         .map_err(|e| new_error(IoErrorKind::Other, format!("TOML parsing error: {}", e)))?;
-    info!("Config loaded successfully");
 
+    // Determine log level
     let log_level = config
         .get("logging")
         .and_then(|l| l.get("level"))
@@ -48,8 +44,9 @@ async fn main() -> Result<(), IoError> {
         })
         .unwrap_or(LevelFilter::Info);
 
+    // Initialize logger only once
     init_logger("casaverde_app", log_level)?;
-    info!("Logger initialized at {:?} level", log_level);
+    info!("Logger initialized for casaverde_app at {:?} level", log_level);
 
     let args = Args::parse();
     let server = std::env::var("SERVER_IP")
@@ -74,4 +71,3 @@ async fn run_tui_mode(server: &str, config_path: &std::path::Path) -> Result<(),
     tui.exit()?;
     Ok(())
 }
-

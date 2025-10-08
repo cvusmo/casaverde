@@ -1,5 +1,4 @@
-
-// Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
+// Copyright 2026 Acris Software Ltd. Co. All Rights Reserved.
 // github.com/cvusmo/casaverde/casaverde_controller
 // src/main.rs
 
@@ -10,29 +9,28 @@ use casaverde_utils::io::{new_error, IoError, IoErrorKind};
 use casaverde_utils::log::{error, info, LevelFilter};
 use casaverde_utils::init_logger;
 use casaverde_utils::path::get_config_path;
-use std::sync::Arc;
-use tokio::{spawn, sync::mpsc, time::interval};
 use casaverde_controller::config;
 use casaverde_controller::controller::{process_local_rules, process_remote_readings, Command};
 use casaverde_controller::gpio;
 use casaverde_controller::serial::{init_serial, send_serial_command};
 use casaverde_controller::sensors::SensorController;
-use toml::Value;
+use std::sync::Arc;
 use std::fs::File;
+use tokio::{spawn, sync::mpsc, time::interval};
+use toml::Value;
 
 #[tokio::main]
 async fn main() -> Result<(), IoError> {
+    // Load config first before logger setup
     let config_path = get_config_path("casaverde_controller");
     println!("Attempting to load config from: {:?}", config_path);
-    if !config_path.exists() {
-        println!("Config file does not exist at: {:?}", config_path);
-    }
+
     let config_str = read_to_string(&config_path)
         .map_err(|e| new_error(IoErrorKind::Other, format!("Failed to read config.toml: {}", e)))?;
     let config_toml: Value = toml::from_str(&config_str)
         .map_err(|e| new_error(IoErrorKind::Other, format!("Failed to parse config.toml: {}", e)))?;
-    info!("Config loaded: {:?}", config_toml);
 
+    // Determine logging level from config
     let log_level = config_toml
         .get("logging")
         .and_then(|l| l.get("level"))
@@ -47,11 +45,15 @@ async fn main() -> Result<(), IoError> {
         })
         .unwrap_or(LevelFilter::Info);
 
+    // Initialize logger only once
     init_logger("casaverde_controller", log_level)?;
+    info!("Logger initialized for casaverde_controller at {:?} level", log_level);
+
     info!("Starting casaverde_controller on {}", config::get_hostname());
 
+    // Load structured config
     let mut config = config::load_config()?;
-    println!("Serial port from config: {:?}", config.serial_port);
+    info!("Serial port from config: {:?}", config.serial_port);
 
     let client = client::build_secure_client()
         .map_err(|e| new_error(IoErrorKind::Other, format!("Failed to build secure client: {}", e)))?;
@@ -79,7 +81,12 @@ async fn main() -> Result<(), IoError> {
 
     let (cmd_tx, mut cmd_rx) = mpsc::channel::<Command>(100);
 
-    spawn(run_light_timer(String::new(), config.light_on_hours, config.light_off_hours, cmd_tx.clone()));
+    spawn(run_light_timer(
+        String::new(),
+        config.light_on_hours,
+        config.light_off_hours,
+        cmd_tx.clone(),
+    ));
 
     let port_clone = port.clone();
     let client_clone = client.clone();
