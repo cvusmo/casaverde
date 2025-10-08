@@ -1,6 +1,6 @@
 # Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 # github.com/cvusmo/casaverde/casaverde_server
-# Config.toml - 
+# Cargo.toml - 
 
 [package]
 name = "casaverde_server"
@@ -13,8 +13,8 @@ axum.workspace = true
 axum-server.workspace = true
 #dirs.workspace = true
 #env_logger.workspace = true
-lazy_static.workspace = true
-log.workspace = true
+#lazy_static.workspace = true
+#log.workspace = true
 reqwest.workspace = true
 rustls.workspace = true
 rustls-pemfile.workspace = true
@@ -22,7 +22,7 @@ serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 toml.workspace = true
-uuid.workspace = true
+#uuid.workspace = true
 casaverde_utils = { path = "../casaverde_utils" }
 
 [[bin]]

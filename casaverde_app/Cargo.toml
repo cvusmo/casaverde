@@ -1,6 +1,6 @@
 # Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 # github.com/cvusmo/casaverde/casaverde_app
-# Config.toml -
+# Cargo.toml
 
 [package]
 name = "casaverde_app"
@@ -9,22 +9,14 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
-clap.workspace = true
 crossterm.workspace = true
 ratatui.workspace = true
 reqwest.workspace = true
-rustls.workspace = true
-rustls-pemfile.workspace = true
-rustls-pki-types.workspace = true
 serde.workspace = true
-serialport.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 toml.workspace = true
-twox-hash.workspace = true
-uuid.workspace = true
 casaverde_utils = { path = "../casaverde_utils" }
-# Removed casaverde_sim
 
 [[bin]]
 name = "casaverde_app"

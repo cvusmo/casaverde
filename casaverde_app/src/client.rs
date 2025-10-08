@@ -3,9 +3,10 @@
 // src/client.rs
 
 use std::error::Error;
-use crate::models::{ConfigEntry};
-use casaverde_utils::log::{error, info, warn};
+use crate::models::ConfigEntry;
+use casaverde_utils::log::{error, info};
 use casaverde_utils::path::get_cert_path;
+use casaverde_utils::Logger;
 use reqwest::{Client, Certificate};
 use serde::Serialize;
 use std::fs;
@@ -20,11 +21,11 @@ pub struct AppClient {
 }
 
 impl AppClient {
-    pub fn new(server: &str, client_id: String) -> Self {
+    pub fn new(server: &str, client_id: String, logger: &mut Logger) -> Self {
         let cert_path = get_cert_path("casaverde_app").expect("Failed to get certificate path");
         let cert_data = fs::read(&cert_path).expect("Failed to read server.crt");
         let cert = Certificate::from_pem(&cert_data).expect("Invalid certificate");
-        info!("Certificate loaded successfully from {:?}", cert_path);
+        info(logger, &format!("Certificate loaded successfully from {:?}", cert_path)).expect("Failed to log");
 
         let client = Client::builder()
             .add_root_certificate(cert)
@@ -41,33 +42,39 @@ impl AppClient {
         }
     }
 
-    pub async fn send_sensor_data<T: Serialize>(&mut self, data: T, endpoint: &str) -> bool {
+    pub async fn send_sensor_data<T: Serialize>(
+        &mut self,
+        data: T,
+        endpoint: &str,
+        logger: &mut Logger,
+    ) -> bool {
         let url = format!("{}/{}", self.server, endpoint.trim_start_matches('/'));
-        info!("Sending JSON to {}: {:?}", url, serde_json::to_string(&data).unwrap_or_default());
+        let data_str = serde_json::to_string(&data).unwrap_or_default();
+        info(logger, &format!("Sending JSON to {}: {:?}", url, data_str))?;
         match self.client.post(&url).json(&data).send().await {
             Ok(resp) => {
                 if resp.status().is_success() {
-                    info!("Successfully sent data to server");
+                    info(logger, "Successfully sent data to server")?;
                     self.last_updated = Instant::now();
                     true
                 } else {
-                    warn!("Failed to send data to {}: status {}", url, resp.status());
+                    error(logger, &format!("Failed to send data to {}: status {}", url, resp.status()))?;
                     if let Ok(text) = resp.text().await {
-                        warn!("Server response: {}", text);
+                        error(logger, &format!("Server response: {}", text))?;
                     }
                     false
                 }
             }
             Err(e) => {
-                error!("Failed to send data to {}: {}", url, e);
+                error(logger, &format!("Failed to send data to {}: {}", url, e))?;
                 if let Some(source) = e.source() {
-                    error!("Error source: {}", source);
+                    error(logger, &format!("Error source: {}", source))?;
                 }
                 if e.is_connect() {
-                    error!("Connection error: check server availability or network");
+                    error(logger, "Connection error: check server availability or network")?;
                 }
                 if e.is_timeout() {
-                    error!("Request timed out");
+                    error(logger, "Request timed out")?;
                 }
                 false
             }

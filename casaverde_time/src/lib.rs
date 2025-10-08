@@ -1,37 +1,16 @@
-//! casaverde_time
-//! 
-//! Placeholder library for time and date utilities.
-//! Eventually replaces `chrono` and provides async timers using `tokio::time`.
+// Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
+// github.com/cvusmo/casaverde/casaverde_time
+// src/lib.rs
 
-pub mod now {
-    use std::time::{SystemTime, UNIX_EPOCH};
+pub mod formatted;
+pub mod timer;
+pub mod timestamp;
 
-    /// Returns the current system timestamp in seconds.
-    pub fn timestamp() -> u64 {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0)
-    }
+pub use formatted::formatted;
+pub use timer::delay_ms;
+pub use timestamp::timestamp;
 
-    /// Returns a formatted UTC timestamp string (placeholder using chrono).
-    pub fn formatted() -> String {
-        use chrono::Utc;
-        Utc::now().to_rfc3339()
-    }
-}
-
-pub mod timer {
-    use std::time::Duration;
-    use tokio::time::sleep;
-
-    /// Async delay helper.
-    pub async fn delay_ms(ms: u64) {
-        sleep(Duration::from_millis(ms)).await;
-    }
-}
-
+/// Initializes the time module.
 pub fn init() {
-    println!("[casaverde_time] Initialized placeholder module");
+    println!("[casaverde_time] Initialized module");
 }
-

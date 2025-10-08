@@ -1,6 +1,6 @@
 # Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 # github.com/cvusmo/casaverde/casaverde_utils
-# Config.toml -
+# Cargo.toml -
 
 [package]
 name = "casaverde_utils"
@@ -9,12 +9,8 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
-log.workspace = true
-env_logger.workspace = true
-chrono.workspace = true
-tokio.workspace = true
-toml.workspace = true
-serde_json.workspace = true
+casaverde_log = { path = "../casaverde_log" }
+casaverde_time = { path = "../casaverde_time" }
 
 [lib]
 name = "casaverde_utils"

@@ -4,7 +4,9 @@
 
 use ratatui::widgets::ListState;
 use crate::devices::DeviceData;
+use casaverde_utils::io::{IoError, new_error, IoErrorKind};
 use casaverde_utils::log::error;
+use casaverde_utils::Logger;
 use crossterm::event::{self, Event, KeyCode};
 use std::io;
 use std::time::{Duration, Instant};
@@ -25,14 +27,14 @@ pub struct App {
     pub running: bool,
     pub screen: Screen,
     pub quit: bool,
-    pub list_state: ListState, // Added list_state
+    pub list_state: ListState,
 }
 
 impl App {
-    pub fn new(config_path: &str, server: &str) -> Self {
+    pub fn new(config_path: &str, server: &str, logger: &mut Logger) -> Self {
         let mut list_state = ListState::default();
         list_state.select(Some(0));
-        let sensor_data = DeviceData::new(config_path, server);
+        let sensor_data = DeviceData::new(config_path, server, logger);
         Self {
             sensor_data,
             selected: 0,
@@ -43,16 +45,17 @@ impl App {
         }
     }
 
-    pub async fn update(&mut self) {
-        if let Err(e) = self.sensor_data.update_devices().await {
-            error!("Device update failed: {:?}", e);
+    pub async fn update(&mut self, logger: &mut Logger) -> Result<(), IoError> {
+        if let Err(e) = self.sensor_data.update_devices(logger).await {
+            error(logger, &format!("Device update failed: {:?}", e))?;
         }
+        Ok(())
     }
 
-    pub fn toggle_selected(&mut self) {
+    pub fn toggle_selected(&mut self, logger: &mut Logger) {
         if let Some(selected) = self.list_state.selected() {
             if selected < self.sensor_data.devices.len() {
-                self.sensor_data.toggle_sensor(selected);
+                self.sensor_data.toggle_sensor(selected, logger);
             }
         }
     }
@@ -88,24 +91,24 @@ impl App {
     }
 }
 
-pub async fn run_app(tui: &mut crate::tui::Tui, app: &mut App) -> io::Result<()> {
+pub async fn run_app(tui: &mut crate::tui::Tui, app: &mut App, logger: &mut Logger) -> Result<(), IoError> {
     let mut last_refresh = Instant::now();
 
     loop {
-        tui.draw(app)?;
+        tui.draw(app).map_err(|e| new_error(IoErrorKind::Other, format!("Failed to draw TUI: {}", e)))?;
 
-        if event::poll(POLL_INTERVAL)? {
-            match event::read()? {
+        if event::poll(POLL_INTERVAL).map_err(|e| new_error(IoErrorKind::Other, format!("Poll error: {}", e)))? {
+            match event::read().map_err(|e| new_error(IoErrorKind::Other, format!("Read event error: {}", e)))? {
                 Event::Key(key) => match key.code {
                     KeyCode::Char('q') => break,
                     KeyCode::Up => app.move_up(),
                     KeyCode::Down => app.move_down(),
-                    KeyCode::Enter => app.toggle_selected(),
+                    KeyCode::Enter => app.toggle_selected(logger),
                     KeyCode::Char('r') => {
-                        app.sensor_data.update_devices().await?;
+                        app.sensor_data.update_devices(logger).await?;
                     }
                     KeyCode::Char('t') => {
-                        app.toggle_selected();
+                        app.toggle_selected(logger);
                     }
                     KeyCode::Char('m') | KeyCode::Char('c') | KeyCode::Char('s') => {
                         app.switch_screen();
@@ -117,7 +120,7 @@ pub async fn run_app(tui: &mut crate::tui::Tui, app: &mut App) -> io::Result<()>
         }
 
         if last_refresh.elapsed() >= DEVICE_REFRESH_INTERVAL {
-            app.update().await;
+            app.update(logger).await?;
             last_refresh = Instant::now();
         }
 

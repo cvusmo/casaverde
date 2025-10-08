@@ -70,6 +70,9 @@ Thumbs.db
 /casaverde_app/test_data/
 /casaverde_server/runtime/
 
+# --- Testing ---
+/casaverde_test
+
 # --- Sensitive backups / old states ---
 **/old/
 **/archive/

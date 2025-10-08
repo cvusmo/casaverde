@@ -1,6 +1,6 @@
 # Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 # github.com/cvusmo/casaverde/casaverde_controller
-# Config.toml - HTTP client setup and data fetching
+# Cargo.toml - HTTP client setup and data fetching
 
 [package]
 name = "casaverde_controller"
@@ -18,7 +18,7 @@ serialport.workspace = true
 tokio.workspace = true
 toml.workspace = true
 casaverde_utils = { path = "../casaverde_utils" }
-rand.workspace = true
+#rand.workspace = true
 
 [[bin]]
 name = "casaverde_controller"

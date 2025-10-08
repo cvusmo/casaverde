@@ -3,7 +3,6 @@
 // src/tui.rs
 
 use crate::app::{App, Screen};
-use crossterm::event::{self, Event, KeyCode};
 use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -131,7 +130,7 @@ fn render_devices(f: &mut Frame, area: Rect, app: &mut App) {
         .collect();
 
     let list = List::new(items)
-        .block(Block::default().title("Devices").borders(Borders::ALL))
+        .block(Block::default().title("Devices").borders(Bordersینی.ALL))
         .highlight_style(
             Style::default()
                 .bg(Color::Yellow)
@@ -242,38 +241,4 @@ fn render_config(f: &mut Frame, area: Rect, app: &App) {
         .block(Block::default().title("Config").borders(Borders::ALL))
         .wrap(ratatui::widgets::Wrap { trim: true });
     f.render_widget(paragraph, area);
-}
-
-/// Handles user input for the TUI.
-pub fn handle_input(app: &mut App) -> io::Result<()> {
-    if event::poll(std::time::Duration::from_millis(10))? {
-        if let Event::Key(k) = event::read()? {
-            match k.code {
-                KeyCode::Char('q') => app.quit = true,
-                KeyCode::Up => app.move_up(),
-                KeyCode::Down => app.move_down(),
-                KeyCode::Enter => {
-                    if let Some(selected) = app.list_state.selected() {
-                        if selected < app.sensor_data.devices.len() {
-                            app.sensor_data.toggle_sensor(selected);
-                            let device = &app.sensor_data.devices[selected];
-                            if let Some(_cfg) = app.sensor_data.config.get(selected) {
-                                let cmd = if device.active {
-                                    format!("SET {} ON", device.id)
-                                } else {
-                                    format!("SET {} OFF", device.id)
-                                };
-                                println!("Sending command to controller: {}", cmd);
-                            }
-                        }
-                    }
-                }
-                KeyCode::Char('m') => app.screen = Screen::Monitoring,
-                KeyCode::Char('c') => app.screen = Screen::Config,
-                KeyCode::Char('d') => app.screen = Screen::Devices,
-                _ => {}
-            }
-        }
-    }
-    Ok(())
 }

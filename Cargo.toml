@@ -1,44 +1,44 @@
 # Copyright 2025 Acris Software Ltd. Co. All Rights Reserved.
 # github.com/cvusmo/casaverde/
-# Config.toml - 
+# Cargo.toml - 
 
 [workspace]
 members = [
     "casaverde_app",
     "casaverde_controller",
+    "casaverde_lazy",
+    "casaverde_log",
     "casaverde_server",
     "casaverde_sim",
+    "casaverde_test",
     "casaverde_time",
     "casaverde_utils",
 ]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Acris Software Ltd. Co."]
 edition = "2024"
 
 [workspace.dependencies]
-log = "0.4.22" # casaverde_utils::logger 
-env_logger = "0.11.5" # casaverde_utils::logger 
-tokio = { version = "1.40.0", features = ["full"] }
-serde = { version = "1.0.210", features = ["derive"] }
-serde_json = "1.0.128"
-reqwest = { version = "0.12.8", features = ["json", "rustls-tls"], default-features = false }
-toml = "0.8.19"
-uuid = { version = "1.10.0", features = ["v4"] } # casaverde_utils::id build IDs with time + counter + optional random bits
-serialport = "4.7.3"
-rustls = "0.23.13"
-rustls-pemfile = "2.1.3"
-rustls-pki-types = "1.8.0"
-axum = "0.7.5"
-axum-server = { version = "0.6.0", features = ["tls-rustls"] }
-#dirs = "5.0.1" # casaverde_utils:filesystem standard library handles paths well std::env::var, home_dir
-lazy_static = "1.5.0" # const init or OnceCell or remove entirely. can use std::sync::OnceLock
-clap = { version = "4.5.42", features = ["derive"] } # casaverde_utils::args implement lightweight command line parser using std::env::args()
-crossterm = "0.29.0"
-ratatui = "0.29.0"
-#regex = "1.11.3" # casaverde_utils::pattern implement minimal pattern matcher
-chrono = "0.4.42" # casaverde_time
-rand = "0.9.2" # casaverde_utils::rand simple rng using std::rand API or system entropy source
-twox-hash = "2.1.2"
+#log = "0.4.22" # Scheduled for removal: Replaced by casaverde_log
+#env_logger = "0.11.5" # Scheduled for removal: Replaced by casaverde_log
+tokio = { version = "1.40.0", features = ["full"] } # Needed for async in casaverde_time, casaverde_app, etc.
+serde = { version = "1.0.210", features = ["derive"] } # Needed for serialization in casaverde_app
+serde_json = "1.0.128" # Needed for JSON in casaverde_app; consider std-only parser later
+reqwest = { version = "0.12.8", features = ["json", "rustls-tls"], default-features = false } # Needed for HTTP in casaverde_app; consider tokio-based alternative
+toml = "0.8.19" # Needed for config parsing; consider std-only parser later
+#uuid = { version = "1.10.0", features = ["v4"] } # Scheduled for removal: Replaced by casaverde_utils::uuid
+serialport = "4.7.3" # Needed for casaverde_controller
+rustls = "0.23.13" # Needed for TLS
+rustls-pemfile = "2.1.3" # Needed for TLS
+rustls-pki-types = "1.8.0" # Needed for TLS
+axum = "0.7.5" # Needed for casaverde_server
+axum-server = { version = "0.6.0", features = ["tls-rustls"] } # Needed for casaverde_server
+#lazy_static = "1.5.0" # Scheduled for removal: Replace with std::sync::OnceLock
+#clap = { version = "4.5.42", features = ["derive"] } # Scheduled for removal: Replace with std::env::args
+crossterm = "0.29.0" # Needed for casaverde_app TUI
+ratatui = "0.29.0" # Needed for casaverde_app TUI
+#rand = "0.9.2" # Scheduled for removal: Not used
+#twox-hash = "2.1.2" # Scheduled for removal: Not used
